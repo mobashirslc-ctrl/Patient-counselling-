@@ -193,7 +193,7 @@ export default function App() {
               className="w-full h-full object-contain p-0.5" 
             />
           </div>
-          <span className="text-xl font-black text-teal-900 tracking-tight">G-CARE</span>
+          <span className="text-xl font-black text-teal-900 tracking-tight">ZEE CARE</span>
           <span className="text-[10px] font-black text-teal-500 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full uppercase tracking-widest">Pro</span>
         </div>
 
@@ -500,7 +500,7 @@ export default function App() {
                 className="w-full h-full object-contain" 
               />
             </div>
-            <span className="text-white font-black text-xl tracking-tight">G-CARE</span>
+            <span className="text-white font-black text-xl tracking-tight">ZEE CARE</span>
           </div>
           <p className="text-white/40 text-sm font-['DM_Sans',sans-serif]">© 2026 ZEE CARE. Powered by Gorun Ltd.</p>
           <button
@@ -615,7 +615,7 @@ export default function App() {
     />
   </div>
   <div className="flex flex-col">
-    <span className="text-white font-black text-base leading-none">G-CARE</span>
+    <span className="text-white font-black text-base leading-none">ZEE CARE</span>
     <span className="text-[9px] font-bold text-teal-200/70 mt-0.5 tracking-wider">MEDITRACK CLIENT</span>
   </div>
 </div>
@@ -839,7 +839,7 @@ export default function App() {
     />
   </div>
   <div className="flex flex-col">
-    <span className="text-white font-black text-base leading-none">G-CARE</span>
+    <span className="text-white font-black text-base leading-none">ZEE CARE</span>
     <span className="text-[9px] font-bold text-indigo-200/70 mt-0.5 tracking-wider">TEAM PORTAL</span>
   </div>
 </div>
