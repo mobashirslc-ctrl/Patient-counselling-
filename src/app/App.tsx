@@ -187,7 +187,7 @@ export default function App() {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-200">
             <Heart className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-black text-teal-900 tracking-tight">GCARE</span>
+          <span className="text-xl font-black text-teal-900 tracking-tight">ZEE CARE</span>
           <span className="text-[10px] font-black text-teal-500 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full uppercase tracking-widest">Pro</span>
         </div>
         <div className="hidden md:flex items-center gap-8 text-sm font-bold text-slate-500">
@@ -228,7 +228,7 @@ export default function App() {
               </span>
             </h1>
             <p className="text-lg text-white/70 leading-relaxed mb-9 max-w-lg font-['DM_Sans',sans-serif]">
-              GCARE connects doctors and care teams in real-time — streamlining patient followups, prescription data entry, and daily call management from one premium platform.
+              ZEE CARE connects doctors and care teams in real-time — streamlining patient followups, prescription data entry, and daily call management from one premium platform.
             </p>
             <div className="flex flex-wrap gap-4 mb-10">
               <button
@@ -488,9 +488,9 @@ export default function App() {
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center">
               <Heart className="w-4 h-4 text-white" />
             </div>
-            <span className="text-white font-black text-xl">GCARE</span>
+            <span className="text-white font-black text-xl">ZEE CARE</span>
           </div>
-          <p className="text-white/40 text-sm font-['DM_Sans',sans-serif]">© 2026 GCARE. Powered by Gorun Ltd.</p>
+          <p className="text-white/40 text-sm font-['DM_Sans',sans-serif]">© 2026 ZEE CARE. Powered by Gorun Ltd.</p>
           <button
             onClick={() => setPage("login")}
             className="text-teal-300 font-bold text-sm hover:text-white transition-colors flex items-center gap-1.5"
