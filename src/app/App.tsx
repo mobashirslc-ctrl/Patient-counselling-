@@ -182,28 +182,27 @@ export default function App() {
   if (page === "landing") return (
     <div className="min-h-screen font-['Nunito',sans-serif] overflow-x-hidden">
 
-      {/* Navbar */}
+ {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-teal-100 px-6 py-4 flex items-center justify-between shadow-sm shadow-teal-50">
-       <div className="flex items-center gap-2.5">
-  {/* এখানে হার্ট আইকনের বদলে আপনার নিজস্ব লোগো ইমেজটি বসানো হলো */}
-  <div className="w-9 h-9 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-md border border-slate-100">
-    <img 
-      src={logoImg} 
-      alt="G-Care Logo" 
-      className="w-full h-full object-contain p-0.5" 
-    />
-  </div>
-  <span className="text-xl font-black text-teal-900 tracking-tight">G-CARE</span>
-  <span className="text-[10px] font-black text-teal-500 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full uppercase tracking-widest">Pro</span>
-</div>
-          <span className="text-xl font-black text-teal-900 tracking-tight">ZEE CARE</span>
+        <div className="flex items-center gap-2.5">
+          {/* Exact G-Care PNG Logo Implementation */}
+          <div className="w-9 h-9 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-md border border-slate-100">
+            <img 
+              src={logoImg} 
+              alt="G-Care Logo" 
+              className="w-full h-full object-contain p-0.5" 
+            />
+          </div>
+          <span className="text-xl font-black text-teal-900 tracking-tight">G-CARE</span>
           <span className="text-[10px] font-black text-teal-500 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full uppercase tracking-widest">Pro</span>
         </div>
+
         <div className="hidden md:flex items-center gap-8 text-sm font-bold text-slate-500">
           <a href="#features" className="hover:text-teal-600 transition-colors">Features</a>
           <a href="#how" className="hover:text-teal-600 transition-colors">How It Works</a>
           <a href="#stats" className="hover:text-teal-600 transition-colors">For Teams</a>
         </div>
+
         <button
           onClick={() => setPage("login")}
           className="bg-gradient-to-r from-teal-500 to-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-sm hover:shadow-lg hover:shadow-teal-200 transition-all duration-200 flex items-center gap-2"
@@ -211,7 +210,6 @@ export default function App() {
           Sign In <ArrowRight className="w-4 h-4" />
         </button>
       </nav>
-
       {/* ── Hero ── */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
         <div className="absolute inset-0 bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-900" />
