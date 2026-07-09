@@ -488,7 +488,7 @@ export default function App() {
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center">
               <Heart className="w-4 h-4 text-white" />
             </div>
-            <span className="text-white font-black text-xl">MediTrack Pro</span>
+            <span className="text-white font-black text-xl">GCARE</span>
           </div>
           <p className="text-white/40 text-sm font-['DM_Sans',sans-serif]">© 2026 GCARE. Powered by Gorun Ltd.</p>
           <button
