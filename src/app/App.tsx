@@ -1,0 +1,1217 @@
+import React, { useState } from "react";
+import {
+  Heart, Users, Phone, FileText, CheckCircle, LogOut,
+  Bell, Calendar, Clipboard, Activity, Search, Plus,
+  Eye, Clock, AlertCircle, Stethoscope, Shield,
+  ArrowRight, Check, User, PhoneCall, ClipboardList,
+  UserCheck, ChevronRight, Pill, BarChart3,
+} from "lucide-react";
+
+// ─── Types ────────────────────────────────────────────────────
+
+type Page = "landing" | "login" | "doctor" | "team";
+type DoctorView = "patients" | "team";
+type TeamView = "call-list" | "data-entry" | "patient-detail";
+
+// ─── Mock Data ────────────────────────────────────────────────
+
+const CREDS: Record<string, { password: string; role: "doctor" | "team"; name: string }> = {
+  "doctor@meditrack.com": { password: "doctor123", role: "doctor", name: "Dr. Farhan Ahmed" },
+  "team@meditrack.com": { password: "team123", role: "team", name: "Sakib Hasan" },
+};
+
+const DOCTORS = [
+  { id: "D001", name: "Dr. Farhan Ahmed", specialty: "Cardiology" },
+  { id: "D002", name: "Dr. Nusrat Jahan", specialty: "Diabetology" },
+];
+
+const INIT_PATIENTS = [
+  {
+    id: "P001", name: "Rahim Uddin", doctorId: "D001", status: "Stable",
+    lastFollowup: "2026-07-07", condition: "Hypertension + Diabetes",
+    phone: "01711-234567", age: 58, address: "Mirpur-10, Dhaka",
+    nextFollowup: "2026-07-21",
+    medications: ["Amlodipine 5mg", "Metformin 500mg"],
+    teamNote: "Patient reported improvement in BP readings. Following prescribed diet plan correctly.",
+  },
+  {
+    id: "P002", name: "Fatema Begum", doctorId: "D001", status: "Critical",
+    lastFollowup: "2026-07-05", condition: "Congestive Heart Failure",
+    phone: "01822-345678", age: 65, address: "Uttara Sector-7, Dhaka",
+    nextFollowup: "2026-07-10",
+    medications: ["Furosemide 40mg", "Atorvastatin 20mg", "Carvedilol 6.25mg"],
+    teamNote: "Breathing difficulty reported during call. Advised immediate in-person check-up. Urgent review needed.",
+  },
+  {
+    id: "P003", name: "Karim Molla", doctorId: "D001", status: "Follow-up Due",
+    lastFollowup: "2026-06-30", condition: "Cardiac Arrhythmia",
+    phone: "01933-456789", age: 45, address: "Banani, Dhaka",
+    nextFollowup: "2026-07-09",
+    medications: ["Bisoprolol 5mg", "Aspirin 75mg"],
+    teamNote: "Patient missed last 2 scheduled calls. Rescheduled for today. Follow-up overdue.",
+  },
+  {
+    id: "P004", name: "Rokeya Khatun", doctorId: "D002", status: "Stable",
+    lastFollowup: "2026-07-08", condition: "Type-2 Diabetes",
+    phone: "01644-567890", age: 52, address: "Dhanmondi, Dhaka",
+    nextFollowup: "2026-07-22",
+    medications: ["Insulin Glargine 20U", "Metformin 1000mg"],
+    teamNote: "HbA1c improved to 7.2. Patient compliant with medication. Continue current regimen.",
+  },
+];
+
+const INIT_TEAM = [
+  { id: "T001", name: "Sakib Hasan", role: "Senior Data Entry", phone: "01755-111222", email: "sakib@meditrack.com", joinDate: "2025-03-15", callsToday: 8 },
+  { id: "T002", name: "Riya Akter", role: "Call Specialist", phone: "01866-222333", email: "riya@meditrack.com", joinDate: "2025-05-20", callsToday: 6 },
+  { id: "T003", name: "Mehedi Hasan", role: "Data Entry", phone: "01977-333444", email: "mehedi@meditrack.com", joinDate: "2026-01-10", callsToday: 5 },
+];
+
+const INIT_CALLS = [
+  { id: "CL001", patientId: "P001", status: "pending", priority: "High", reason: "Medication compliance check — weekly routine", callDate: "2026-07-09" },
+  { id: "CL002", patientId: "P002", status: "pending", priority: "Urgent", reason: "Post-discharge followup — breathing and weight check", callDate: "2026-07-09" },
+  { id: "CL003", patientId: "P003", status: "pending", priority: "Normal", reason: "Scheduled monthly followup — overdue", callDate: "2026-07-09" },
+];
+
+const STATUS_CHIP: Record<string, string> = {
+  "Stable": "bg-emerald-100 text-emerald-700",
+  "Critical": "bg-red-100 text-red-700",
+  "Follow-up Due": "bg-amber-100 text-amber-700",
+  "New Patient": "bg-blue-100 text-blue-700",
+};
+
+const PRIORITY_CHIP: Record<string, string> = {
+  "Urgent": "bg-red-50 text-red-600 border border-red-200",
+  "High": "bg-orange-50 text-orange-600 border border-orange-200",
+  "Normal": "bg-blue-50 text-blue-600 border border-blue-200",
+};
+
+// ─── Small shared component ───────────────────────────────────
+
+function InfoBlock({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+  return (
+    <div className="bg-slate-50 rounded-2xl p-4">
+      <div className="flex items-center gap-1.5 text-slate-400 mb-1">
+        {icon}
+        <span className="text-xs font-bold uppercase tracking-wide">{label}</span>
+      </div>
+      <p className="text-slate-700 font-semibold text-sm leading-snug">{value || "—"}</p>
+    </div>
+  );
+}
+
+// ─── App ──────────────────────────────────────────────────────
+
+export default function App() {
+  const [page, setPage] = useState<Page>("landing");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>(null);
+  const [doctorView, setDoctorView] = useState<DoctorView>("patients");
+  const [teamView, setTeamView] = useState<TeamView>("call-list");
+  const [patients, setPatients] = useState(INIT_PATIENTS);
+  const [callList, setCallList] = useState(INIT_CALLS);
+  const [callNotes, setCallNotes] = useState<Record<string, string>>({});
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dataEntry, setDataEntry] = useState({
+    patientName: "", age: "", phone: "", address: "",
+    doctorId: "", diagnosis: "", medications: "", nextFollowup: "", notes: "",
+  });
+  const [entrySuccess, setEntrySuccess] = useState(false);
+
+  const login = () => {
+    const cred = CREDS[email];
+    if (cred && cred.password === password) {
+      setCurrentUser({ name: cred.name, role: cred.role });
+      setLoginError("");
+      setPage(cred.role);
+    } else {
+      setLoginError("Invalid credentials. Please contact your admin for access.");
+    }
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    setEmail("");
+    setPassword("");
+    setPage("landing");
+  };
+
+  const completeCall = (callId: string) => {
+    if (!callNotes[callId]?.trim()) return;
+    setCallList(prev => prev.map(c => c.id === callId ? { ...c, status: "completed" } : c));
+  };
+
+  const submitDataEntry = () => {
+    if (!dataEntry.patientName || !dataEntry.doctorId || !dataEntry.phone) return;
+    const id = `P${String(patients.length + 1).padStart(3, "0")}`;
+    setPatients(prev => [...prev, {
+      id,
+      name: dataEntry.patientName,
+      doctorId: dataEntry.doctorId,
+      status: "New Patient",
+      lastFollowup: new Date().toISOString().split("T")[0],
+      condition: dataEntry.diagnosis || "Pending diagnosis",
+      phone: dataEntry.phone,
+      age: parseInt(dataEntry.age) || 0,
+      address: dataEntry.address,
+      nextFollowup: dataEntry.nextFollowup,
+      medications: dataEntry.medications.split(",").map(m => m.trim()).filter(Boolean),
+      teamNote: "New patient added via data entry on " + new Date().toLocaleDateString("en-GB"),
+    }]);
+    setDataEntry({ patientName: "", age: "", phone: "", address: "", doctorId: "", diagnosis: "", medications: "", nextFollowup: "", notes: "" });
+    setEntrySuccess(true);
+    setTimeout(() => setEntrySuccess(false), 4000);
+  };
+
+  const doctorPatients = patients.filter(p => p.doctorId === "D001");
+  const filtered = doctorPatients.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.condition.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const selectedPatient = patients.find(p => p.id === selectedPatientId);
+  const pendingCalls = callList.filter(c => c.status === "pending").length;
+  const doneCalls = callList.filter(c => c.status === "completed").length;
+
+  // ═══════════════════════════════════════════════════════════
+  // LANDING PAGE
+  // ═══════════════════════════════════════════════════════════
+
+  if (page === "landing") return (
+    <div className="min-h-screen font-['Nunito',sans-serif] overflow-x-hidden">
+
+      {/* Navbar */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-teal-100 px-6 py-4 flex items-center justify-between shadow-sm shadow-teal-50">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-200">
+            <Heart className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-xl font-black text-teal-900 tracking-tight">MediTrack</span>
+          <span className="text-[10px] font-black text-teal-500 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full uppercase tracking-widest">Pro</span>
+        </div>
+        <div className="hidden md:flex items-center gap-8 text-sm font-bold text-slate-500">
+          <a href="#features" className="hover:text-teal-600 transition-colors">Features</a>
+          <a href="#how" className="hover:text-teal-600 transition-colors">How It Works</a>
+          <a href="#stats" className="hover:text-teal-600 transition-colors">For Teams</a>
+        </div>
+        <button
+          onClick={() => setPage("login")}
+          className="bg-gradient-to-r from-teal-500 to-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-sm hover:shadow-lg hover:shadow-teal-200 transition-all duration-200 flex items-center gap-2"
+        >
+          Sign In <ArrowRight className="w-4 h-4" />
+        </button>
+      </nav>
+
+      {/* ── Hero ── */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
+        <div className="absolute inset-0 bg-gradient-to-br from-teal-600 via-teal-700 to-emerald-900" />
+        {/* Watermark image */}
+        <div
+          className="absolute inset-0 opacity-[0.09] bg-cover bg-center"
+          style={{ backgroundImage: "url(https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1920&auto=format&fit=crop)" }}
+        />
+        <div className="absolute top-24 right-10 w-[500px] h-[500px] bg-purple-500 rounded-full opacity-20 blur-[80px]" />
+        <div className="absolute bottom-24 left-10 w-[400px] h-[400px] bg-orange-400 rounded-full opacity-20 blur-[80px]" />
+        <div className="absolute top-1/3 left-1/3 w-[600px] h-[300px] bg-cyan-400 rounded-full opacity-10 blur-[100px]" />
+
+        <div className="relative z-10 max-w-6xl mx-auto px-6 py-24 grid md:grid-cols-2 gap-16 items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 text-xs font-bold px-4 py-2 rounded-full mb-7 uppercase tracking-widest">
+              <Activity className="w-3.5 h-3.5 text-emerald-300" />
+              Patient Followup Platform
+            </div>
+            <h1 className="text-5xl md:text-6xl font-black text-white leading-[1.05] mb-6">
+              Smart Care,<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-cyan-300 to-teal-200">
+                Seamless Followup
+              </span>
+            </h1>
+            <p className="text-lg text-white/70 leading-relaxed mb-9 max-w-lg font-['DM_Sans',sans-serif]">
+              MediTrack connects doctors and care teams in real-time — streamlining patient followups, prescription data entry, and daily call management from one premium platform.
+            </p>
+            <div className="flex flex-wrap gap-4 mb-10">
+              <button
+                onClick={() => setPage("login")}
+                className="bg-white text-teal-700 font-black px-8 py-4 rounded-2xl hover:shadow-2xl hover:shadow-teal-900/40 transition-all duration-200 flex items-center gap-2 text-lg"
+              >
+                Get Started <ChevronRight className="w-5 h-5" />
+              </button>
+              <button className="border-2 border-white/25 text-white font-black px-8 py-4 rounded-2xl hover:bg-white/10 hover:border-white/40 transition-all duration-200 text-lg">
+                Watch Demo
+              </button>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="flex -space-x-3">
+                {[
+                  "photo-1559839734-2b71ea197ec2",
+                  "photo-1612349317150-e413f6a5b16d",
+                  "photo-1582750433449-648ed127bb54",
+                ].map((id, i) => (
+                  <img
+                    key={i}
+                    src={`https://images.unsplash.com/photo-${id}?w=48&h=48&fit=crop&auto=format`}
+                    className="w-11 h-11 rounded-full border-[3px] border-teal-600 object-cover"
+                    alt="Doctor"
+                  />
+                ))}
+              </div>
+              <div>
+                <p className="text-white font-black text-sm">500+ Doctors Enrolled</p>
+                <p className="text-white/50 text-xs font-['DM_Sans',sans-serif]">Trusted by top clinics in Bangladesh</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Hero card */}
+          <div className="hidden md:block">
+            <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-6 shadow-2xl shadow-teal-900/40">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="font-black text-white text-lg">Today's Patient Updates</h3>
+                  <p className="text-white/50 text-xs font-['DM_Sans',sans-serif]">Dr. Farhan Ahmed • Cardiology</p>
+                </div>
+                <span className="flex items-center gap-1.5 bg-emerald-400/20 text-emerald-300 text-xs font-bold px-3 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                  Live
+                </span>
+              </div>
+              {[
+                { name: "Rahim Uddin", status: "Stable", note: "BP improved — following diet plan", time: "10:30 AM", dot: "bg-emerald-400" },
+                { name: "Fatema Begum", status: "Critical", note: "Breathing difficulty — urgent review", time: "9:15 AM", dot: "bg-red-400" },
+                { name: "Karim Molla", status: "Due", note: "Missed 2 calls — rescheduled today", time: "8:45 AM", dot: "bg-amber-400" },
+              ].map((p, i) => (
+                <div key={i} className="flex items-start gap-3 py-3.5 border-b border-white/10 last:border-0">
+                  <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${p.dot}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-bold text-white text-sm">{p.name}</p>
+                      <span className="text-white/35 text-xs flex-shrink-0 font-['DM_Sans',sans-serif]">{p.time}</span>
+                    </div>
+                    <p className="text-white/55 text-xs mt-0.5 font-['DM_Sans',sans-serif] leading-relaxed">{p.note}</p>
+                  </div>
+                </div>
+              ))}
+              <div className="mt-5 grid grid-cols-3 gap-3">
+                {[
+                  { label: "Patients", value: "24", color: "text-emerald-300" },
+                  { label: "Calls Today", value: "12", color: "text-cyan-300" },
+                  { label: "Team Active", value: "3", color: "text-purple-300" },
+                ].map((s, i) => (
+                  <div key={i} className="bg-white/5 rounded-2xl p-3 text-center">
+                    <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+                    <p className="text-white/40 text-[10px] mt-0.5 font-['DM_Sans',sans-serif]">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 80L1440 80L1440 30C1200 70 960 10 720 40C480 70 240 10 0 30L0 80Z" fill="#F0FBF9" />
+          </svg>
+        </div>
+      </section>
+
+      {/* ── Features ── */}
+      <section id="features" className="py-24 bg-[#F0FBF9] relative overflow-hidden">
+        <div
+          className="absolute inset-0 opacity-[0.025] bg-cover bg-center"
+          style={{ backgroundImage: "url(https://images.unsplash.com/photo-1576671081837-49000212a370?w=1920&auto=format&fit=crop)" }}
+        />
+        <div className="relative z-10 max-w-6xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <span className="inline-block bg-teal-100 text-teal-700 font-black text-xs px-4 py-2 rounded-full mb-4 uppercase tracking-widest">Platform Features</span>
+            <h2 className="text-4xl font-black text-teal-900 mb-4 leading-tight">Everything Your Care Team Needs</h2>
+            <p className="text-slate-500 max-w-xl mx-auto text-lg font-['DM_Sans',sans-serif]">
+              One platform, three powerful roles — designed for doctors, data entry teams, and call specialists.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                icon: <Stethoscope className="w-7 h-7" />,
+                title: "Doctor Dashboard",
+                desc: "Real-time patient status updates from your team. Monitor conditions, team notes, and followup dates at a glance.",
+                grad: "from-teal-500 to-emerald-600",
+              },
+              {
+                icon: <ClipboardList className="w-7 h-7" />,
+                title: "Smart Data Entry",
+                desc: "Team enters prescription data from patient forms. Instantly appears in the assigned doctor's live patient list.",
+                grad: "from-purple-500 to-indigo-600",
+              },
+              {
+                icon: <PhoneCall className="w-7 h-7" />,
+                title: "Daily Call Management",
+                desc: "Admin assigns daily call lists. Team can't mark calls complete without adding a note — fully tracked.",
+                grad: "from-orange-500 to-red-500",
+              },
+              {
+                icon: <Shield className="w-7 h-7" />,
+                title: "Admin-Controlled Access",
+                desc: "No open registration. Admin creates and shares credentials — full control over who accesses the platform.",
+                grad: "from-cyan-500 to-blue-600",
+              },
+            ].map((f, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-3xl p-7 shadow-sm border border-teal-50 hover:shadow-xl hover:shadow-teal-100/60 transition-all duration-300 group cursor-default"
+              >
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${f.grad} flex items-center justify-center text-white mb-5 group-hover:scale-110 transition-transform duration-200 shadow-lg`}>
+                  {f.icon}
+                </div>
+                <h3 className="font-black text-slate-800 text-lg mb-2">{f.title}</h3>
+                <p className="text-slate-500 text-sm leading-relaxed font-['DM_Sans',sans-serif]">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── How It Works ── */}
+      <section id="how" className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-700 to-pink-600" />
+        <div
+          className="absolute inset-0 opacity-[0.06] bg-cover bg-center"
+          style={{ backgroundImage: "url(https://images.unsplash.com/photo-1504813184591-a058ada5ab5?w=1920&auto=format&fit=crop)" }}
+        />
+        <div className="absolute top-0 left-0 right-0">
+          <svg viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 0L1440 0L1440 50C1200 10 960 70 720 40C480 10 240 70 0 50L0 0Z" fill="#F0FBF9" />
+          </svg>
+        </div>
+
+        <div className="relative z-10 max-w-5xl mx-auto px-6 pt-12">
+          <div className="text-center mb-16">
+            <span className="inline-block bg-white/10 backdrop-blur-sm border border-white/20 text-white font-black text-xs px-4 py-2 rounded-full mb-4 uppercase tracking-widest">How It Works</span>
+            <h2 className="text-4xl font-black text-white mb-4">Three Steps to Better Patient Care</h2>
+            <p className="text-white/65 max-w-xl mx-auto text-lg font-['DM_Sans',sans-serif]">
+              Simple for doctors, powerful for teams, seamless for patients.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 relative">
+            {[
+              {
+                step: "01", title: "Admin Sets Up",
+                desc: "Admin creates doctor and team accounts, assigns daily call lists, and controls all platform access.",
+                icon: <Shield className="w-7 h-7" />, grad: "from-yellow-400 to-orange-500",
+              },
+              {
+                step: "02", title: "Team Works",
+                desc: "Team members enter patient data, make assigned calls, and update patient status with mandatory call notes.",
+                icon: <Users className="w-7 h-7" />, grad: "from-pink-400 to-rose-500",
+              },
+              {
+                step: "03", title: "Doctor Reviews",
+                desc: "Doctor sees all patient updates from their team in real-time — status, notes, conditions, and followup dates.",
+                icon: <Stethoscope className="w-7 h-7" />, grad: "from-cyan-400 to-teal-500",
+              },
+            ].map((s, i) => (
+              <div key={i} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-3xl p-8 text-center relative">
+                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${s.grad} flex items-center justify-center text-white mx-auto mb-4 shadow-xl`}>
+                  {s.icon}
+                </div>
+                <span className="text-white/20 text-6xl font-black block mb-3 leading-none">{s.step}</span>
+                <h3 className="text-white font-black text-xl mb-3">{s.title}</h3>
+                <p className="text-white/60 text-sm leading-relaxed font-['DM_Sans',sans-serif]">{s.desc}</p>
+                {i < 2 && (
+                  <div className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white/10 rounded-full items-center justify-center">
+                    <ArrowRight className="w-4 h-4 text-white/50" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 80L1440 80L1440 30C1200 70 960 10 720 40C480 70 240 10 0 30L0 80Z" fill="white" />
+          </svg>
+        </div>
+      </section>
+
+      {/* ── Stats / CTA ── */}
+      <section id="stats" className="py-24 bg-white relative overflow-hidden">
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1/2 opacity-[0.04] bg-cover bg-center"
+          style={{ backgroundImage: "url(https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=960&auto=format&fit=crop)" }}
+        />
+        <div className="relative z-10 max-w-6xl mx-auto px-6">
+          <div className="grid md:grid-cols-2 gap-16 items-center">
+            <div>
+              <span className="inline-block bg-orange-100 text-orange-600 font-black text-xs px-4 py-2 rounded-full mb-5 uppercase tracking-widest">Premium Platform</span>
+              <h2 className="text-4xl font-black text-slate-800 mb-6 leading-tight">
+                Doctor-Friendly.<br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-emerald-600">
+                  Team-Powered.
+                </span>
+              </h2>
+              <p className="text-slate-500 text-lg leading-relaxed mb-8 font-['DM_Sans',sans-serif]">
+                No complex setup. No lengthy registrations. Your team gets to work immediately with admin-provided credentials. Doctors see exactly what matters — nothing more, nothing less.
+              </p>
+              <button
+                onClick={() => setPage("login")}
+                className="bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-black px-8 py-4 rounded-2xl hover:shadow-xl hover:shadow-teal-200 transition-all duration-200 flex items-center gap-3 text-lg"
+              >
+                <Heart className="w-5 h-5" />
+                Access Platform Now
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { value: "500+", label: "Doctors Enrolled", grad: "from-teal-400 to-emerald-500", icon: <Stethoscope className="w-6 h-6" /> },
+                { value: "12K+", label: "Patients Tracked", grad: "from-purple-400 to-indigo-500", icon: <Users className="w-6 h-6" /> },
+                { value: "98%", label: "Call Completion", grad: "from-orange-400 to-red-500", icon: <PhoneCall className="w-6 h-6" /> },
+                { value: "24/7", label: "Platform Uptime", grad: "from-cyan-400 to-blue-500", icon: <Activity className="w-6 h-6" /> },
+              ].map((s, i) => (
+                <div key={i} className={`bg-gradient-to-br ${s.grad} rounded-3xl p-7 text-white shadow-lg`}>
+                  <div className="mb-3 opacity-75">{s.icon}</div>
+                  <p className="text-4xl font-black mb-1">{s.value}</p>
+                  <p className="text-white/65 font-bold text-sm font-['DM_Sans',sans-serif]">{s.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-teal-900 py-12 px-6">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center">
+              <Heart className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-white font-black text-xl">MediTrack Pro</span>
+          </div>
+          <p className="text-white/40 text-sm font-['DM_Sans',sans-serif]">© 2026 MediTrack Pro. Premium Patient Followup Platform.</p>
+          <button
+            onClick={() => setPage("login")}
+            className="text-teal-300 font-bold text-sm hover:text-white transition-colors flex items-center gap-1.5"
+          >
+            Sign In to Platform <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </footer>
+    </div>
+  );
+
+  // ═══════════════════════════════════════════════════════════
+  // LOGIN PAGE
+  // ═══════════════════════════════════════════════════════════
+
+  if (page === "login") return (
+    <div className="min-h-screen font-['Nunito',sans-serif] relative flex items-center justify-center overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-teal-600 via-emerald-700 to-teal-900" />
+      <div
+        className="absolute inset-0 opacity-[0.08] bg-cover bg-center"
+        style={{ backgroundImage: "url(https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1920&auto=format&fit=crop)" }}
+      />
+      <div className="absolute top-20 right-20 w-72 h-72 bg-purple-400 rounded-full opacity-20 blur-3xl" />
+      <div className="absolute bottom-20 left-20 w-72 h-72 bg-orange-400 rounded-full opacity-20 blur-3xl" />
+
+      <div className="relative z-10 w-full max-w-md mx-auto px-6">
+        <div className="bg-white rounded-3xl p-9 shadow-2xl shadow-teal-900/40">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center mx-auto mb-4 shadow-xl shadow-teal-200">
+              <Heart className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-black text-teal-900">Welcome to MediTrack</h1>
+            <p className="text-slate-400 text-sm mt-1 font-['DM_Sans',sans-serif]">Sign in with your admin-provided credentials</p>
+          </div>
+
+          <div className="space-y-5">
+            <div>
+              <label className="block text-sm font-black text-slate-700 mb-2">Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && login()}
+                placeholder="your@email.com"
+                className="w-full border-2 border-slate-200 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:border-teal-400 transition-colors font-['DM_Sans',sans-serif]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-black text-slate-700 mb-2">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && login()}
+                placeholder="••••••••"
+                className="w-full border-2 border-slate-200 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:border-teal-400 transition-colors font-['DM_Sans',sans-serif]"
+              />
+            </div>
+
+            {loginError && (
+              <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-600 text-sm p-4 rounded-xl font-['DM_Sans',sans-serif]">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {loginError}
+              </div>
+            )}
+
+            <button
+              onClick={login}
+              className="w-full bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-black py-4 rounded-xl hover:shadow-lg hover:shadow-teal-200 transition-all duration-200 text-lg"
+            >
+              Sign In
+            </button>
+          </div>
+
+          <div className="mt-6 bg-teal-50 border border-teal-100 rounded-2xl p-4">
+            <p className="text-xs font-black text-teal-700 mb-2 uppercase tracking-wide">Demo Credentials</p>
+            <div className="space-y-1.5 text-xs text-teal-600 font-['DM_Sans',sans-serif]">
+              <p><span className="font-bold">Doctor login:</span> doctor@meditrack.com / doctor123</p>
+              <p><span className="font-bold">Team login:</span> team@meditrack.com / team123</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setPage("landing")}
+            className="w-full mt-4 text-slate-400 text-sm font-bold hover:text-teal-600 transition-colors font-['DM_Sans',sans-serif]"
+          >
+            ← Back to Home
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ═══════════════════════════════════════════════════════════
+  // DOCTOR DASHBOARD
+  // ═══════════════════════════════════════════════════════════
+
+  if (page === "doctor") return (
+    <div className="min-h-screen bg-[#F0FBF9] font-['Nunito',sans-serif] flex">
+      {/* Sidebar */}
+      <aside className="w-64 bg-gradient-to-b from-teal-700 to-emerald-800 flex flex-col flex-shrink-0 min-h-screen shadow-2xl shadow-teal-900/30">
+        <div className="p-6 border-b border-white/10">
+          <div className="flex items-center gap-2 mb-5">
+            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+              <Heart className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-white font-black">MediTrack</span>
+          </div>
+          <div className="bg-white/10 rounded-2xl p-4">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+              <User className="w-5 h-5 text-white" />
+            </div>
+            <p className="text-white font-black text-sm">{currentUser?.name}</p>
+            <p className="text-white/50 text-xs font-['DM_Sans',sans-serif] mt-0.5">Cardiology • D001</p>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-1">
+          {[
+            { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
+            { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => setDoctorView(item.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-150 ${
+                doctorView === item.id
+                  ? "bg-white text-teal-700 shadow-lg shadow-teal-900/20"
+                  : "text-white/65 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {item.icon}
+              <span className="flex-1 text-left">{item.label}</span>
+              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${doctorView === item.id ? "bg-teal-100 text-teal-600" : "bg-white/10 text-white/50"}`}>
+                {item.badge}
+              </span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 pt-0">
+          <div className="bg-white/5 rounded-2xl p-4 mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart3 className="w-3.5 h-3.5 text-white/40" />
+              <p className="text-white/40 text-xs font-['DM_Sans',sans-serif]">Today's Activity</p>
+            </div>
+            <p className="text-white font-black text-xl">{INIT_CALLS.length} <span className="text-white/40 text-sm font-normal">calls assigned</span></p>
+          </div>
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:bg-white/10 hover:text-white text-sm font-bold transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <main className="flex-1 overflow-auto">
+        <header className="bg-white border-b border-teal-100 px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-teal-50">
+          <div>
+            <h1 className="text-xl font-black text-teal-900">
+              {doctorView === "patients" ? "Patient Overview" : "My Care Team"}
+            </h1>
+            <p className="text-slate-400 text-sm font-['DM_Sans',sans-serif]">
+              {doctorView === "patients"
+                ? `${doctorPatients.length} patients under your care`
+                : `${INIT_TEAM.length} active team members assigned`}
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="relative cursor-pointer group">
+              <Bell className="w-5 h-5 text-slate-400 group-hover:text-teal-600 transition-colors" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full text-white text-[10px] font-black flex items-center justify-center">3</span>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
+              <User className="w-5 h-5 text-white" />
+            </div>
+          </div>
+        </header>
+
+        <div className="p-8">
+          {/* ── Patients View ── */}
+          {doctorView === "patients" && (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                {[
+                  { label: "Total Patients", value: doctorPatients.length, grad: "from-teal-400 to-emerald-500", icon: <Users className="w-5 h-5" /> },
+                  { label: "Stable", value: doctorPatients.filter(p => p.status === "Stable").length, grad: "from-green-400 to-emerald-500", icon: <CheckCircle className="w-5 h-5" /> },
+                  { label: "Critical", value: doctorPatients.filter(p => p.status === "Critical").length, grad: "from-red-400 to-rose-500", icon: <AlertCircle className="w-5 h-5" /> },
+                  { label: "Follow-up Due", value: doctorPatients.filter(p => p.status === "Follow-up Due").length, grad: "from-amber-400 to-orange-500", icon: <Clock className="w-5 h-5" /> },
+                ].map((s, i) => (
+                  <div key={i} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-5 text-white shadow-lg`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-white/65 text-xs font-bold uppercase tracking-wide">{s.label}</p>
+                      <div className="opacity-60">{s.icon}</div>
+                    </div>
+                    <p className="text-3xl font-black">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="relative mb-6">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search by patient name or condition..."
+                  className="w-full bg-white border-2 border-teal-100 rounded-xl pl-11 pr-4 py-3.5 text-sm focus:outline-none focus:border-teal-400 transition-colors font-['DM_Sans',sans-serif]"
+                />
+              </div>
+
+              <div className="space-y-3">
+                {filtered.map(p => (
+                  <div key={p.id} className="bg-white rounded-2xl p-6 border border-teal-50 hover:shadow-lg hover:shadow-teal-100/60 transition-all duration-200">
+                    <div className="flex items-start gap-5">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-100 to-emerald-100 flex items-center justify-center flex-shrink-0">
+                        <User className="w-6 h-6 text-teal-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4 flex-wrap mb-1">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-black text-slate-800 text-lg">{p.name}</h3>
+                              <span className="text-slate-300 text-xs font-mono">{p.id}</span>
+                            </div>
+                            <p className="text-slate-500 text-sm font-['DM_Sans',sans-serif]">{p.condition} • Age {p.age} • {p.address}</p>
+                          </div>
+                          <span className={`text-xs font-black px-3 py-1.5 rounded-full flex-shrink-0 ${STATUS_CHIP[p.status] || "bg-slate-100 text-slate-600"}`}>
+                            {p.status}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 bg-teal-50 rounded-xl p-3.5 border-l-4 border-teal-400">
+                          <p className="text-xs font-black text-teal-600 mb-1 uppercase tracking-wide">Team Update</p>
+                          <p className="text-sm text-teal-800 font-['DM_Sans',sans-serif] leading-relaxed">{p.teamNote}</p>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400 font-['DM_Sans',sans-serif]">
+                          <span className="flex items-center gap-1.5"><Calendar className="w-3 h-3" /> Last followup: <strong className="text-slate-600">{p.lastFollowup}</strong></span>
+                          <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Next followup: <strong className="text-slate-600">{p.nextFollowup}</strong></span>
+                          <span className="flex items-center gap-1.5"><Phone className="w-3 h-3" /> {p.phone}</span>
+                        </div>
+
+                        {p.medications.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {p.medications.map((m, i) => (
+                              <span key={i} className="inline-flex items-center gap-1 bg-slate-50 text-slate-600 text-xs font-semibold px-2.5 py-1 rounded-lg border border-slate-100">
+                                <Pill className="w-2.5 h-2.5 text-teal-400" /> {m}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {filtered.length === 0 && (
+                  <div className="text-center py-20 text-slate-300">
+                    <Users className="w-14 h-14 mx-auto mb-3 opacity-40" />
+                    <p className="font-black text-slate-400 text-lg">No patients found</p>
+                    <p className="text-sm font-['DM_Sans',sans-serif]">Try adjusting your search query</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ── Team View ── */}
+          {doctorView === "team" && (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {INIT_TEAM.map(t => (
+                <div key={t.id} className="bg-white rounded-2xl p-6 border border-teal-50 hover:shadow-lg hover:shadow-teal-100/60 transition-all duration-200">
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-purple-100">
+                      <User className="w-7 h-7 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-800 text-lg">{t.name}</h3>
+                      <span className="text-xs font-black text-purple-600 bg-purple-50 px-2.5 py-0.5 rounded-full">{t.role}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2.5 text-sm font-['DM_Sans',sans-serif]">
+                    <div className="flex items-center gap-2.5 text-slate-500">
+                      <Phone className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" /> {t.phone}
+                    </div>
+                    <div className="flex items-center gap-2.5 text-slate-500">
+                      <FileText className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
+                      <span className="truncate">{t.email}</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 text-slate-500">
+                      <Calendar className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" /> Joined {t.joinDate}
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs text-emerald-600 font-black bg-emerald-50 px-3 py-1 rounded-lg">● Active</span>
+                    <span className="text-xs text-slate-400 font-['DM_Sans',sans-serif]">{t.callsToday} calls today</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+
+  // ═══════════════════════════════════════════════════════════
+  // TEAM DASHBOARD
+  // ═══════════════════════════════════════════════════════════
+
+  if (page === "team") return (
+    <div className="min-h-screen bg-[#F0FBF9] font-['Nunito',sans-serif] flex">
+      {/* Sidebar */}
+      <aside className="w-64 bg-gradient-to-b from-indigo-700 to-purple-800 flex flex-col flex-shrink-0 min-h-screen shadow-2xl shadow-indigo-900/30">
+        <div className="p-6 border-b border-white/10">
+          <div className="flex items-center gap-2 mb-5">
+            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+              <Heart className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-white font-black">MediTrack</span>
+          </div>
+          <div className="bg-white/10 rounded-2xl p-4">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+              <User className="w-5 h-5 text-white" />
+            </div>
+            <p className="text-white font-black text-sm">{currentUser?.name}</p>
+            <p className="text-white/50 text-xs font-['DM_Sans',sans-serif] mt-0.5">Team Member • T001</p>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-1">
+          {[
+            { id: "call-list" as TeamView, label: "Daily Call List", icon: <PhoneCall className="w-4 h-4" />, badge: pendingCalls, urgent: pendingCalls > 0 },
+            { id: "data-entry" as TeamView, label: "Patient Data Entry", icon: <ClipboardList className="w-4 h-4" />, badge: null, urgent: false },
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => { setTeamView(item.id); setSelectedPatientId(null); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-150 ${
+                teamView === item.id
+                  ? "bg-white text-indigo-700 shadow-lg shadow-indigo-900/20"
+                  : "text-white/65 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {item.icon}
+              <span className="flex-1 text-left">{item.label}</span>
+              {item.badge !== null && (
+                <span className={`text-xs font-black px-2 py-0.5 rounded-full ${item.urgent ? "bg-orange-400 text-white" : "bg-white/10 text-white/50"}`}>
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 pt-0">
+          <div className="bg-white/10 rounded-2xl p-4 mb-3">
+            <p className="text-white/40 text-xs font-['DM_Sans',sans-serif] mb-2">Today's Progress</p>
+            <div className="w-full bg-white/10 rounded-full h-2 mb-2">
+              <div
+                className="bg-gradient-to-r from-emerald-400 to-teal-400 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${callList.length ? (doneCalls / callList.length) * 100 : 0}%` }}
+              />
+            </div>
+            <p className="text-white font-black text-lg">{doneCalls}<span className="text-white/40 font-normal text-sm">/{callList.length} calls done</span></p>
+          </div>
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:bg-white/10 hover:text-white text-sm font-bold transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <main className="flex-1 overflow-auto">
+        <header className="bg-white border-b border-indigo-100 px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-indigo-50">
+          <div>
+            <h1 className="text-xl font-black text-indigo-900">
+              {teamView === "call-list" ? "Daily Call List" :
+               teamView === "data-entry" ? "Patient Data Entry" :
+               "Patient Details"}
+            </h1>
+            <p className="text-slate-400 text-sm font-['DM_Sans',sans-serif]">
+              {teamView === "call-list" ? `${pendingCalls} calls pending · ${doneCalls} completed today` :
+               teamView === "data-entry" ? "Enter patient details from prescription forms" :
+               `Viewing: ${selectedPatient?.name} • ${selectedPatientId}`}
+            </p>
+          </div>
+          {teamView === "patient-detail" && (
+            <button
+              onClick={() => { setTeamView("call-list"); setSelectedPatientId(null); }}
+              className="flex items-center gap-2 text-sm font-bold text-indigo-500 hover:text-indigo-800 transition-colors"
+            >
+              ← Back to Call List
+            </button>
+          )}
+        </header>
+
+        <div className="p-8">
+
+          {/* ── Call List ── */}
+          {teamView === "call-list" && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl p-6 border border-indigo-50 shadow-sm mb-2">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="font-black text-slate-700">Today's Progress — {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</p>
+                  <p className="text-sm font-black text-indigo-600">{doneCalls}/{callList.length} Completed</p>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-3">
+                  <div
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-700"
+                    style={{ width: `${callList.length ? (doneCalls / callList.length) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+
+              {callList.map(call => {
+                const patient = patients.find(p => p.id === call.patientId);
+                if (!patient) return null;
+                const noteVal = callNotes[call.id] || "";
+                return (
+                  <div
+                    key={call.id}
+                    className={`bg-white rounded-2xl p-6 border-2 transition-all duration-200 ${
+                      call.status === "completed"
+                        ? "border-emerald-200 opacity-75"
+                        : call.priority === "Urgent"
+                        ? "border-red-100 hover:shadow-lg hover:shadow-red-50"
+                        : call.priority === "High"
+                        ? "border-orange-100 hover:shadow-lg hover:shadow-orange-50"
+                        : "border-transparent hover:shadow-lg hover:shadow-indigo-50"
+                    }`}
+                  >
+                    <div className="flex items-start gap-5">
+                      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${call.status === "completed" ? "bg-emerald-100" : "bg-indigo-100"}`}>
+                        {call.status === "completed"
+                          ? <Check className="w-5 h-5 text-emerald-600" />
+                          : <PhoneCall className="w-5 h-5 text-indigo-600" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4 flex-wrap mb-2">
+                          <div>
+                            <button
+                              onClick={() => { setSelectedPatientId(patient.id); setTeamView("patient-detail"); }}
+                              className="font-black text-slate-800 text-lg hover:text-indigo-600 transition-colors flex items-center gap-1.5 group"
+                            >
+                              {patient.name}
+                              <Eye className="w-4 h-4 opacity-0 group-hover:opacity-50 transition-opacity" />
+                            </button>
+                            <p className="text-xs text-slate-400 font-mono mt-0.5">{patient.id} • {patient.phone}</p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className={`text-xs font-black px-2.5 py-1 rounded-full ${PRIORITY_CHIP[call.priority]}`}>
+                              {call.priority}
+                            </span>
+                            {call.status === "completed" && (
+                              <span className="text-xs font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                                ✓ Done
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="text-sm text-slate-500 mb-4 flex items-center gap-1.5 font-['DM_Sans',sans-serif]">
+                          <Clipboard className="w-3.5 h-3.5 flex-shrink-0 text-indigo-400" />
+                          {call.reason}
+                        </p>
+
+                        {call.status === "pending" && (
+                          <div className="flex gap-3 items-start">
+                            <textarea
+                              value={noteVal}
+                              onChange={e => setCallNotes(prev => ({ ...prev, [call.id]: e.target.value }))}
+                              placeholder="Add call note here — required before marking complete..."
+                              rows={2}
+                              className="flex-1 border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-indigo-400 transition-colors resize-none font-['DM_Sans',sans-serif]"
+                            />
+                            <button
+                              onClick={() => completeCall(call.id)}
+                              disabled={!noteVal.trim()}
+                              className={`flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all duration-150 ${
+                                noteVal.trim()
+                                  ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-lg hover:shadow-indigo-200"
+                                  : "bg-slate-100 text-slate-300 cursor-not-allowed"
+                              }`}
+                            >
+                              <Check className="w-4 h-4" />
+                              Complete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {callList.every(c => c.status === "completed") && (
+                <div className="text-center py-20">
+                  <div className="w-20 h-20 rounded-3xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle className="w-10 h-10 text-emerald-500" />
+                  </div>
+                  <p className="font-black text-slate-700 text-xl mb-1">All calls completed!</p>
+                  <p className="text-slate-400 font-['DM_Sans',sans-serif]">Great work today. All {callList.length} calls done.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Data Entry ── */}
+          {teamView === "data-entry" && (
+            <div className="max-w-2xl mx-auto">
+              <div className="bg-white rounded-3xl p-8 border border-indigo-50 shadow-sm">
+                {entrySuccess && (
+                  <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl p-4 mb-6">
+                    <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                    <div>
+                      <p className="font-black">Patient Added Successfully!</p>
+                      <p className="text-sm font-['DM_Sans',sans-serif]">Patient is now visible in the assigned doctor's dashboard.</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <ClipboardList className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="font-black text-slate-800 text-lg">New Patient from Prescription</h2>
+                    <p className="text-slate-400 text-sm font-['DM_Sans',sans-serif]">Fill all required fields — select doctor to auto-assign</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-black text-slate-700 mb-1.5">
+                      Patient Full Name <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      value={dataEntry.patientName}
+                      onChange={e => setDataEntry(p => ({ ...p, patientName: e.target.value }))}
+                      placeholder="e.g. Mohammed Abdul Karim"
+                      className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400 transition-colors font-['DM_Sans',sans-serif]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-black text-slate-700 mb-1.5">Age</label>
+                    <input
+                      type="number"
+                      value={dataEntry.age}
+                      onChange={e => setDataEntry(p => ({ ...p, age: e.target.value }))}
+                      placeholder="45"
+                      className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400 transition-colors font-['DM_Sans',sans-serif]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-black text-slate-700 mb-1.5">
+                      Phone Number <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      value={dataEntry.phone}
+                      onChange={e => setDataEntry(p => ({ ...p, phone: e.target.value }))}
+                      placeholder="017XX-XXXXXX"
+                      className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400 transition-colors font-['DM_Sans',sans-serif]"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-black text-slate-700 mb-1.5">Address</label>
+                    <input
+                      value={dataEntry.address}
+                      onChange={e => setDataEntry(p => ({ ...p, address: e.target.value }))}
+                      placeholder="Mohammadpur, Dhaka"
+                      className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400 transition-colors font-['DM_Sans',sans-serif]"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-black text-slate-700 mb-1.5">
+                      Assign to Doctor <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      value={dataEntry.doctorId}
+                      onChange={e => setDataEntry(p => ({ ...p, doctorId: e.target.value }))}
+                      className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400 transition-colors bg-white font-['DM_Sans',sans-serif]"
+                    >
+                      <option value="">Select a doctor...</option>
+                      {DOCTORS.map(d => (
+                        <option key={d.id} value={d.id}>{d.name} — {d.specialty}</option>
+                      ))}
+                    </select>
+                    {dataEntry.doctorId && (
+                      <p className="text-xs text-indigo-500 font-semibold mt-1.5 font-['DM_Sans',sans-serif]">
+                        ✓ Patient will appear in {DOCTORS.find(d => d.id === dataEntry.doctorId)?.name}&apos;s dashboard
+                      </p>
+                    )}
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-black text-slate-700 mb-1.5">Diagnosis / Condition</label>
+                    <input
+                      value={dataEntry.diagnosis}
+                      onChange={e => setDataEntry(p => ({ ...p, diagnosis: e.target.value }))}
+                      placeholder="e.g. Hypertension, Type-2 Diabetes"
+                      className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400 transition-colors font-['DM_Sans',sans-serif]"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-black text-slate-700 mb-1.5">Medications <span className="text-slate-400 font-normal">(comma separated)</span></label>
+                    <input
+                      value={dataEntry.medications}
+                      onChange={e => setDataEntry(p => ({ ...p, medications: e.target.value }))}
+                      placeholder="Amlodipine 5mg, Metformin 500mg, Aspirin 75mg"
+                      className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400 transition-colors font-['DM_Sans',sans-serif]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-black text-slate-700 mb-1.5">Next Follow-up Date</label>
+                    <input
+                      type="date"
+                      value={dataEntry.nextFollowup}
+                      onChange={e => setDataEntry(p => ({ ...p, nextFollowup: e.target.value }))}
+                      className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400 transition-colors font-['DM_Sans',sans-serif]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-black text-slate-700 mb-1.5">Additional Notes</label>
+                    <input
+                      value={dataEntry.notes}
+                      onChange={e => setDataEntry(p => ({ ...p, notes: e.target.value }))}
+                      placeholder="Special instructions..."
+                      className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400 transition-colors font-['DM_Sans',sans-serif]"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={submitDataEntry}
+                  disabled={!dataEntry.patientName || !dataEntry.doctorId || !dataEntry.phone}
+                  className={`w-full mt-6 py-4 rounded-2xl font-black text-lg transition-all duration-200 flex items-center justify-center gap-3 ${
+                    dataEntry.patientName && dataEntry.doctorId && dataEntry.phone
+                      ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-xl hover:shadow-indigo-200"
+                      : "bg-slate-100 text-slate-300 cursor-not-allowed"
+                  }`}
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Patient to Doctor's List
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Patient Detail ── */}
+          {teamView === "patient-detail" && selectedPatient && (
+            <div className="max-w-2xl mx-auto">
+              <div className="bg-white rounded-3xl overflow-hidden border border-indigo-50 shadow-sm">
+                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-7 text-white">
+                  <div className="flex items-center gap-5">
+                    <div className="w-18 h-18 w-[72px] h-[72px] rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0 shadow-xl">
+                      <User className="w-9 h-9 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-black">{selectedPatient.name}</h2>
+                      <p className="text-white/60 font-mono text-sm mt-0.5">{selectedPatient.id} • Age {selectedPatient.age}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`text-xs font-black px-3 py-1 rounded-full bg-white/20 text-white`}>
+                          {selectedPatient.status}
+                        </span>
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-white/15 text-white/80 font-['DM_Sans',sans-serif]">
+                          {DOCTORS.find(d => d.id === selectedPatient.doctorId)?.name}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-7 space-y-6">
+                  <div className="grid grid-cols-2 gap-3">
+                    <InfoBlock label="Phone" value={selectedPatient.phone} icon={<Phone className="w-3.5 h-3.5" />} />
+                    <InfoBlock label="Address" value={selectedPatient.address} icon={<FileText className="w-3.5 h-3.5" />} />
+                    <InfoBlock label="Condition" value={selectedPatient.condition} icon={<Activity className="w-3.5 h-3.5" />} />
+                    <InfoBlock label="Assigned Doctor" value={DOCTORS.find(d => d.id === selectedPatient.doctorId)?.name || "N/A"} icon={<Stethoscope className="w-3.5 h-3.5" />} />
+                    <InfoBlock label="Last Followup" value={selectedPatient.lastFollowup} icon={<Calendar className="w-3.5 h-3.5" />} />
+                    <InfoBlock label="Next Followup" value={selectedPatient.nextFollowup || "Not scheduled"} icon={<Clock className="w-3.5 h-3.5" />} />
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Current Medications</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedPatient.medications.length > 0 ? selectedPatient.medications.map((m, i) => (
+                        <span key={i} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-sm font-bold px-3.5 py-2 rounded-xl border border-indigo-100">
+                          <Pill className="w-3.5 h-3.5" /> {m}
+                        </span>
+                      )) : (
+                        <span className="text-slate-400 text-sm font-['DM_Sans',sans-serif]">No medications recorded</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-indigo-50 rounded-2xl p-5 border-l-4 border-indigo-400">
+                    <p className="text-xs font-black text-indigo-600 mb-2 uppercase tracking-wide">Latest Team Note</p>
+                    <p className="text-sm text-indigo-800 font-['DM_Sans',sans-serif] leading-relaxed">{selectedPatient.teamNote}</p>
+                  </div>
+
+                  <button
+                    onClick={() => { setTeamView("call-list"); setSelectedPatientId(null); }}
+                    className="w-full py-3.5 rounded-2xl border-2 border-indigo-200 text-indigo-600 font-black hover:bg-indigo-50 transition-colors"
+                  >
+                    ← Back to Call List
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+
+  return null;
+}
