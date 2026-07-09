@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import logoImg from './components/figma/G-care final 2-01.png';
 import {
   Heart, Users, Phone, FileText, CheckCircle, LogOut,
   Bell, Calendar, Clipboard, Activity, Search, Plus,
@@ -183,10 +184,18 @@ export default function App() {
 
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-teal-100 px-6 py-4 flex items-center justify-between shadow-sm shadow-teal-50">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-200">
-            <Heart className="w-5 h-5 text-white" />
-          </div>
+       <div className="flex items-center gap-2.5">
+  {/* এখানে হার্ট আইকনের বদলে আপনার নিজস্ব লোগো ইমেজটি বসানো হলো */}
+  <div className="w-9 h-9 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-md border border-slate-100">
+    <img 
+      src={logoImg} 
+      alt="G-Care Logo" 
+      className="w-full h-full object-contain p-0.5" 
+    />
+  </div>
+  <span className="text-xl font-black text-teal-900 tracking-tight">G-CARE</span>
+  <span className="text-[10px] font-black text-teal-500 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full uppercase tracking-widest">Pro</span>
+</div>
           <span className="text-xl font-black text-teal-900 tracking-tight">ZEE CARE</span>
           <span className="text-[10px] font-black text-teal-500 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full uppercase tracking-widest">Pro</span>
         </div>
@@ -522,7 +531,7 @@ export default function App() {
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center mx-auto mb-4 shadow-xl shadow-teal-200">
               <Heart className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-black text-teal-900">Welcome to MediTrack</h1>
+            <h1 className="text-2xl font-black text-teal-900">Welcome to ZEE CARE</h1>
             <p className="text-slate-400 text-sm mt-1 font-['DM_Sans',sans-serif]">Sign in with your admin-provided credentials</p>
           </div>
 
@@ -593,12 +602,20 @@ export default function App() {
       {/* Sidebar */}
       <aside className="w-64 bg-gradient-to-b from-teal-700 to-emerald-800 flex flex-col flex-shrink-0 min-h-screen shadow-2xl shadow-teal-900/30">
         <div className="p-6 border-b border-white/10">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-              <Heart className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-white font-black">MediTrack</span>
-          </div>
+          <div className="flex items-center gap-2.5 mb-5">
+  {/* Doctor Dashboard G-Care PNG Logo */}
+  <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
+    <img 
+      src={logoImg} 
+      alt="G-Care Logo" 
+      className="w-full h-full object-contain" 
+    />
+  </div>
+  <div className="flex flex-col">
+    <span className="text-white font-black text-base leading-none">G-CARE</span>
+    <span className="text-[9px] font-bold text-teal-200/70 mt-0.5 tracking-wider">MEDITRACK CLIENT</span>
+  </div>
+</div>
           <div className="bg-white/10 rounded-2xl p-4">
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
               <User className="w-5 h-5 text-white" />
@@ -809,12 +826,20 @@ export default function App() {
       {/* Sidebar */}
       <aside className="w-64 bg-gradient-to-b from-indigo-700 to-purple-800 flex flex-col flex-shrink-0 min-h-screen shadow-2xl shadow-indigo-900/30">
         <div className="p-6 border-b border-white/10">
-          <div className="flex items-center gap-2 mb-5">
-            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-              <Heart className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-white font-black">MediTrack</span>
-          </div>
+          <div className="flex items-center gap-2.5 mb-5">
+  {/* Team Dashboard G-Care PNG Logo */}
+  <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
+    <img 
+      src={logoImg} 
+      alt="G-Care Logo" 
+      className="w-full h-full object-contain" 
+    />
+  </div>
+  <div className="flex flex-col">
+    <span className="text-white font-black text-base leading-none">G-CARE</span>
+    <span className="text-[9px] font-bold text-indigo-200/70 mt-0.5 tracking-wider">TEAM PORTAL</span>
+  </div>
+</div>
           <div className="bg-white/10 rounded-2xl p-4">
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
               <User className="w-5 h-5 text-white" />
