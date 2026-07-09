@@ -228,7 +228,7 @@ export default function App() {
               </span>
             </h1>
             <p className="text-lg text-white/70 leading-relaxed mb-9 max-w-lg font-['DM_Sans',sans-serif]">
-              MediTrack connects doctors and care teams in real-time — streamlining patient followups, prescription data entry, and daily call management from one premium platform.
+              GCARE connects doctors and care teams in real-time — streamlining patient followups, prescription data entry, and daily call management from one premium platform.
             </p>
             <div className="flex flex-wrap gap-4 mb-10">
               <button
