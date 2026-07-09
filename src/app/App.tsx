@@ -187,7 +187,7 @@ export default function App() {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-200">
             <Heart className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-black text-teal-900 tracking-tight">MediTrack</span>
+          <span className="text-xl font-black text-teal-900 tracking-tight">GCARE</span>
           <span className="text-[10px] font-black text-teal-500 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full uppercase tracking-widest">Pro</span>
         </div>
         <div className="hidden md:flex items-center gap-8 text-sm font-bold text-slate-500">
@@ -490,7 +490,7 @@ export default function App() {
             </div>
             <span className="text-white font-black text-xl">MediTrack Pro</span>
           </div>
-          <p className="text-white/40 text-sm font-['DM_Sans',sans-serif]">© 2026 MediTrack Pro. Premium Patient Followup Platform.</p>
+          <p className="text-white/40 text-sm font-['DM_Sans',sans-serif]">© 2026 GCARE. Powered by Gorun Ltd.</p>
           <button
             onClick={() => setPage("login")}
             className="text-teal-300 font-bold text-sm hover:text-white transition-colors flex items-center gap-1.5"
