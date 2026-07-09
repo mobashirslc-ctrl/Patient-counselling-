@@ -492,10 +492,15 @@ export default function App() {
       <footer className="bg-teal-900 py-12 px-6">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center">
-              <Heart className="w-4 h-4 text-white" />
+            {/* Footer G-Care PNG Logo Implementation */}
+            <div className="w-8 h-8 rounded-xl overflow-hidden bg-white flex items-center justify-center p-0.5 shadow-sm">
+              <img 
+                src={logoImg} 
+                alt="ZEE CARE Logo" 
+                className="w-full h-full object-contain" 
+              />
             </div>
-            <span className="text-white font-black text-xl">ZEE CARE</span>
+            <span className="text-white font-black text-xl tracking-tight">G-CARE</span>
           </div>
           <p className="text-white/40 text-sm font-['DM_Sans',sans-serif]">© 2026 ZEE CARE. Powered by Gorun Ltd.</p>
           <button
@@ -605,7 +610,7 @@ export default function App() {
   <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
     <img 
       src={logoImg} 
-      alt="G-Care Logo" 
+      alt="ZEE CARE Logo" 
       className="w-full h-full object-contain" 
     />
   </div>
