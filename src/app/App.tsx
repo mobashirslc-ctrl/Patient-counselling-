@@ -636,6 +636,7 @@ export default function App() {
     // 👇 ঠিক এই নতুন লাইনটি নিচে যোগ হয়ে যাবে
     { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: 0 },
   ].map(item => (
+    <button
               key={item.id}
               onClick={() => setDoctorView(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-150 ${
