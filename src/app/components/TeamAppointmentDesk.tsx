@@ -1,7 +1,6 @@
-import React from "react";
-import { ChevronRight, CheckCircle, AlertCircle } from "lucide-react";
+import React, { useState } from "react";
+import { ChevronRight, CheckCircle, AlertCircle, Plus, X } from "lucide-react";
 
-// টাইপ ডেফিনিশন
 interface AppointmentItem {
   id: number;
   name: string;
@@ -19,22 +18,76 @@ interface TeamAppointmentDeskProps {
 const PIPELINE_STEPS = ["Patient Request", "Verify Data", "Hospital Schedule", "Doctor Slot", "Notify Patient"];
 
 export default function TeamAppointmentDesk({ appointments, setAppointments }: TeamAppointmentDeskProps) {
+  // Modal State
+  const [isOpen, setIsOpen] = useState(false);
   
+  // Form State
+  const [formData, setFormData] = useState({
+    name: "",
+    doctor: "Dr. Farhan Ahmed",
+    date: "",
+    time: "",
+  });
+
   const advanceAppointmentStep = (id: number) => {
     setAppointments(prev =>
       prev.map(a => (a.id === id && a.step < 4 ? { ...a, step: a.step + 1 } : a))
     );
   };
 
+  // Form Submit Handler
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.date || !formData.time) return;
+
+    // নতুন অ্যাপয়েন্টমেন্ট অবজেক্ট তৈরি
+    const newAppointment: AppointmentItem = {
+      id: Date.now(), // Unique ID
+      name: formData.name,
+      doctor: formData.doctor,
+      // Date ফরম্যাট একটু সুন্দর করার জন্য (যেমন: 2026-07-14 থেকে 14 Jul 2026)
+      date: new Date(formData.date).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric"
+      }),
+      // Time ফরম্যাট (যেমন: 14:30 থেকে 02:30 PM)
+      time: new Date(`2000-01-01T${formData.time}`).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      step: 0, // প্রথম স্টেপ "Patient Request" থেকে শুরু হবে
+    };
+
+    setAppointments(prev => [newAppointment, ...prev]); // একদম উপরে যুক্ত হবে
+    setFormData({ name: "", doctor: "Dr. Farhan Ahmed", date: "", time: "" }); // রিসেট
+    setIsOpen(false); // মোডাল বন্ধ
+  };
+
   return (
     <div className="space-y-6">
+      
+      {/* টপ বার: টাইটেল এবং ক্রিয়েট বাটন */}
+      <div className="flex items-center justify-between border-b border-indigo-50 pb-4">
+        <div>
+          <h2 className="text-xl font-black text-slate-800">Operational Desk</h2>
+          <p className="text-xs text-slate-400 font-medium">Manage and onboarding new patient paths</p>
+        </div>
+        <button
+          onClick={() => setIsOpen(true)}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md shadow-indigo-100 transition-all"
+        >
+          <Plus size={16} /> Create Appointment
+        </button>
+      </div>
+
       {/* ইনফো ব্যানার */}
       <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl text-sm font-semibold flex items-center gap-2">
         <AlertCircle size={16} className="text-amber-600" />
         এখানে কোনো অ্যাপয়েন্টমেন্ট প্রসেস বা আপডেট করা হলে তা সরাসরি Doctor ড্যাশবোর্ডের Grid View-তে লাইভ রিফ্লেক্ট করবে।
       </div>
 
-      {/* পাইপলাইন লিস্ট */}
+      {/* পাইপライン লিস্ট */}
       <div className="space-y-4">
         {appointments.map(app => (
           <div key={app.id} className="bg-white rounded-2xl border border-indigo-50 shadow-sm p-6">
@@ -76,6 +129,91 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
           </div>
         ))}
       </div>
+
+      {/* ─── POPUP MODAL FORM ─── */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 overflow-hidden m-4">
+            
+            {/* Modal Header */}
+            <div className="bg-indigo-50 px-6 py-4 flex items-center justify-between border-b border-indigo-100">
+              <h3 className="font-black text-indigo-950 text-base">New Appointment Entry</h3>
+              <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body / Form */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">Patient Name</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter full name"
+                  className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:border-indigo-500 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">Assign Doctor</label>
+                <select
+                  value={formData.doctor}
+                  onChange={e => setFormData({ ...formData, doctor: e.target.value })}
+                  className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold bg-white focus:outline-none focus:border-indigo-500 transition-colors"
+                >
+                  <option value="Dr. Farhan Ahmed">Dr. Farhan Ahmed (Cardiology)</option>
+                  <option value="Dr. Nusrat Jahan">Dr. Nusrat Jahan (Diabetology)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.date}
+                    onChange={e => setFormData({ ...formData, date: e.target.value })}
+                    className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">Time</label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.time}
+                    onChange={e => setFormData({ ...formData, time: e.target.value })}
+                    className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="text-slate-500 hover:bg-slate-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm px-5 py-2.5 rounded-xl shadow-md shadow-indigo-100 transition-all"
+                >
+                  Submit & Sync
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
