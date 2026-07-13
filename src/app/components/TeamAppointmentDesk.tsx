@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import { ChevronRight, CheckCircle, AlertCircle, Plus, X, UserCheck, Paperclip, FileText } from "lucide-react";
+// db এবং Firestore ফাংশন ইম্পোর্ট
+import { db } from "../firebase";
+import { collection, addDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 interface AppointmentItem {
-  id: number;
+  id: string;
   name: string;
   doctor: string;
   date: string;
@@ -12,7 +15,6 @@ interface AppointmentItem {
   phone: string;
   chiefComplaint: string;
   vitalSigns?: string;
-  // 🆕 নতুন ফিল্ডস (Cloudinary URL, Severity & Team Notes)
   condition: "Normal" | "Urgent" | "Critical";
   documentUrl?: string;
   teamNotes?: string;
@@ -20,16 +22,15 @@ interface AppointmentItem {
 
 interface TeamAppointmentDeskProps {
   appointments: AppointmentItem[];
-  setAppointments: React.Dispatch<React.SetStateAction<AppointmentItem[]>>;
 }
 
 const PIPELINE_STEPS = ["Patient Request", "Verify Data", "Hospital Schedule", "Doctor Slot", "Notify Patient"];
 
-export default function TeamAppointmentDesk({ appointments, setAppointments }: TeamAppointmentDeskProps) {
+export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDeskProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   
-  // আপডেটেড ফর্ম স্টেট
+  // ফর্ম স্টেট
   const [formData, setFormData] = useState({
     name: "",
     doctor: "Dr. Farhan Ahmed",
@@ -44,7 +45,7 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
     teamNotes: "",
   });
 
-  // ☁️ Cloudinary File Upload Handler
+  // ☁️ Cloudinary File Upload Handler (সম্পূর্ণ লজিক)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -52,11 +53,10 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
     setUploading(true);
     const data = new FormData();
     data.append("file", file);
-    // Cloudinary আপলোডের জন্য আপনার preset নামটি এখানে ব্যবহার করুন
+    // Cloudinary আপলোডের জন্য আপনার preset ও cloud_name বসাবেন
     data.append("upload_preset", "your_cloudinary_preset"); 
 
     try {
-      // আপনার Cloudinary ক্লাউড নেম দিয়ে URL টি রিপ্লেস করে নিবেন
       const res = await fetch("https://api.cloudinary.com/v1_1/your_cloud_name/image/upload", {
         method: "POST",
         body: data,
@@ -69,57 +69,65 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
       }
     } catch (err) {
       console.error("Cloudinary upload failed:", err);
-      alert("Failed to upload document. Please check Cloudinary configuration.");
+      alert("Failed to upload document.");
     } finally {
       setUploading(false);
     }
   };
 
-  const advanceAppointmentStep = (id: number) => {
-    setAppointments(prev =>
-      prev.map(a => (a.id === id && a.step < 4 ? { ...a, step: a.step + 1 } : a))
-    );
+  // 🔄 Firebase-এ পাইপলাইন স্টেপ আপডেট
+  const advanceAppointmentStep = async (id: string, currentStep: number) => {
+    if (currentStep >= 4) return;
+    try {
+      const docRef = doc(db, "zee_care_appointments", id);
+      await updateDoc(docRef, { step: currentStep + 1 });
+    } catch (error) {
+      console.error("Error updating step:", error);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // 🔥 Firebase Firestore-এ ডেটা পাঠানো
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.date || !formData.time || !formData.phone) return;
 
-    const newAppointment: AppointmentItem = {
-      id: Date.now(),
-      name: formData.name,
-      doctor: formData.doctor,
-      date: new Date(formData.date).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric"
-      }),
-      time: new Date(`2000-01-01T${formData.time}`).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      step: 0,
-      age: formData.age,
-      phone: formData.phone,
-      chiefComplaint: formData.chiefComplaint,
-      vitalSigns: formData.vitalSigns,
-      condition: formData.condition,
-      documentUrl: formData.documentUrl,
-      teamNotes: formData.teamNotes,
-    };
+    try {
+      await addDoc(collection(db, "zee_care_appointments"), {
+        name: formData.name,
+        doctor: formData.doctor,
+        date: new Date(formData.date).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric"
+        }),
+        time: new Date(`2000-01-01T${formData.time}`).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        step: 0,
+        age: formData.age,
+        phone: formData.phone,
+        chiefComplaint: formData.chiefComplaint,
+        vitalSigns: formData.vitalSigns,
+        condition: formData.condition,
+        documentUrl: formData.documentUrl,
+        teamNotes: formData.teamNotes,
+        createdAt: new Date().getTime() // শর্টিং এর জন্য টাইমস্ট্যাম্প
+      });
 
-    setAppointments(prev => [newAppointment, ...prev]);
-    
-    // ফর্ম রিসেট
-    setFormData({ 
-      name: "", doctor: "Dr. Farhan Ahmed", date: "", time: "", 
-      age: "", phone: "", chiefComplaint: "", vitalSigns: "",
-      condition: "Normal", documentUrl: "", teamNotes: ""
-    });
-    setIsOpen(false);
+      // ফর্ম রিসেট
+      setFormData({ 
+        name: "", doctor: "Dr. Farhan Ahmed", date: "", time: "", 
+        age: "", phone: "", chiefComplaint: "", vitalSigns: "",
+        condition: "Normal", documentUrl: "", teamNotes: ""
+      });
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Error adding to Firebase:", error);
+      alert("Database sync failed!");
+    }
   };
 
-  // কন্ডিশন অনুযায়ী কালার কোড ডিফাইন করার জন্য helper
   const getBadgeColor = (cond: string) => {
     if (cond === "Critical") return "bg-rose-100 text-rose-700 border-rose-200";
     if (cond === "Urgent") return "bg-amber-100 text-amber-700 border-amber-200";
@@ -146,7 +154,7 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
       {/* Info Banner */}
       <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl text-sm font-semibold flex items-center gap-2">
         <AlertCircle size={16} className="text-amber-600" />
-        পেশেন্টের মেডিকেল ডকুমেন্টস ক্লাউডিনারিতে আপলোড করুন। কন্ডিশন এবং সেশন নোটস ডক্টর ড্যাশবোর্ডে লাইভ দেখতে পাবেন।
+        হাসপাতালের সিরিয়াল চেক করে পেশেন্টের সাথে কথা বলে এই তথ্যগুলো পূরণ করুন। এটি সরাসরি Doctor ড্যাশবোর্ডে চলে যাবে।
       </div>
 
       {/* Pipeline List */}
@@ -167,7 +175,7 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
               
               {app.step < 4 ? (
                 <button 
-                  onClick={() => advanceAppointmentStep(app.id)}
+                  onClick={() => advanceAppointmentStep(app.id, app.step)}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 transition-colors"
                 >
                   Next Step: {PIPELINE_STEPS[app.step + 1]} <ChevronRight size={14} />
@@ -179,7 +187,7 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
               )}
             </div>
 
-            {/* 🩺 প্রি-কনসালটেশন কার্ড (ডক্টর ড্যাশবোর্ড সিঙ্ক) */}
+            {/* প্রি-কনসালটেশন কার্ড */}
             <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 text-xs space-y-2">
               <div className="flex items-center gap-1 text-indigo-700 font-black uppercase tracking-wider text-[10px]">
                 <UserCheck size={12} /> Pre-Consultation Support Data
@@ -188,7 +196,6 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
               {app.vitalSigns && <p className="text-slate-700 font-medium"><strong className="text-slate-900">Vitals/History:</strong> {app.vitalSigns}</p>}
               {app.teamNotes && <p className="text-slate-600 italic"><strong className="text-slate-900 font-normal not-italic font-semibold">Team Assessment:</strong> "{app.teamNotes}"</p>}
               
-              {/* 📑 ক্লাউডিনারি ফাইল লিঙ্ক */}
               {app.documentUrl && (
                 <a 
                   href={app.documentUrl} 
@@ -236,7 +243,7 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
               </button>
             </div>
 
-            {/* Modal Body (Scrollable) */}
+            {/* Modal Body */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
               
               {/* ১. বেসিক অ্যাপয়েন্টমেন্ট ইনফো */}
@@ -260,7 +267,6 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
                       <option value="Dr. Nusrat Jahan">Dr. Nusrat Jahan</option>
                     </select>
                   </div>
-                  {/* 🚨 Patient Condition Dropdown */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Patient Condition</label>
                     <select value={formData.condition} onChange={e => setFormData({ ...formData, condition: e.target.value as any })} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500">
@@ -302,7 +308,6 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Vitals (BP/Pulse/Sugar)</label>
                     <input type="text" placeholder="e.g. BP 140/90" value={formData.vitalSigns} onChange={e => setFormData({ ...formData, vitalSigns: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500" />
                   </div>
-                  {/* ☁️ Cloudinary File Attachment Field */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Previous Reports (PDF/Image)</label>
                     <div className="relative">
@@ -316,7 +321,6 @@ export default function TeamAppointmentDesk({ appointments, setAppointments }: T
                   </div>
                 </div>
 
-                {/* 📝 Short Notes Fields (Final Status/Assessment) */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">Team assessment & Short notes (পেশেন্টের ফাইনাল অবস্থা)</label>
                   <input type="text" placeholder="যেমন: পেশেন্ট অনেক দুর্বল, হুইলচেয়ার প্রয়োজন হতে পারে..." value={formData.teamNotes} onChange={e => setFormData({ ...formData, teamNotes: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500" />
