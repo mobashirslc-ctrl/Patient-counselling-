@@ -1,4 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { db } from "./firebase"; // আপনার লোকাল কনফিগারেশন ফাইল
+
+// ইমেজ ও কম্পোনেন্ট ইমপোর্ট
 import logoImg from './components/figma/G-care final 2-01.png';
 import AppointmentSection from "./components/AppointmentSection";
 import TeamAppointmentDesk from "./components/TeamAppointmentDesk";
@@ -121,11 +126,34 @@ export default function App() {
     doctorId: "", diagnosis: "", medications: "", nextFollowup: "", notes: "",
   });
   const [entrySuccess, setEntrySuccess] = useState(false);
-  const [appointments, setAppointments] = useState([
-    { id: 1, name: "Imran Hossain", doctor: "Dr. Farhan Ahmed", date: "14 Jul 2026", time: "10:00 AM", step: 0 },
-    { id: 2, name: "Moriom Begum", doctor: "Dr. Nusrat Jahan", date: "15 Jul 2026", time: "3:00 PM", step: 1 },
-    { id: 3, name: "Jahangir Alam", doctor: "Dr. Farhan Ahmed", date: "16 Jul 2026", time: "11:00 AM", step: 0 },
-  ]);
+  
+  // 🔄 ফায়ারবেস থেকে লাইভ ডাটা হোল্ড করার জন্য স্টেট (ডিফল্ট ফাঁকা অ্যারে)
+  const [appointments, setAppointments] = useState<any[]>([]);
+
+  // ─── 🔥 FIREBASE REALTIME LISTENER ADDED HERE ───
+  useEffect(() => {
+    // টিম ডেস্ক যে কালেকশনে ডাটা পাঠাচ্ছে (zee_care_appointments) সেটির কুয়েরি তৈরি
+    const q = query(
+      collection(db, "zee_care_appointments"), 
+      orderBy("createdAt", "desc")
+    );
+    
+    // অন-স্ন্যাপশট লিসেনার যা রিফ্রেশ ছাড়া রিয়েল-টাইমে ডাটা নিয়ে আসবে
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const appointmentsArray: any[] = [];
+      querySnapshot.forEach((doc) => {
+        appointmentsArray.push({ id: doc.id, ...doc.data() });
+      });
+      // লাইভ স্টেট আপডেট
+      setAppointments(appointmentsArray);
+    }, (error) => {
+      console.error("Firestore live fetch error:", error);
+    });
+
+    // কম্পোনেন্ট আনমাউন্ট হলে কানেকশন বন্ধ করার জন্য
+    return () => unsubscribe();
+  }, []);
+  // ───────────────────────────────────────────────
 
   const login = () => {
     const cred = CREDS[email];
@@ -180,7 +208,6 @@ export default function App() {
   const selectedPatient = patients.find(p => p.id === selectedPatientId);
   const pendingCalls = callList.filter(c => c.status === "pending").length;
   const doneCalls = callList.filter(c => c.status === "completed").length;
-
   // ═══════════════════════════════════════════════════════════
   // LANDING PAGE
   // ═══════════════════════════════════════════════════════════
@@ -603,28 +630,34 @@ export default function App() {
   );
 
   // ═══════════════════════════════════════════════════════════
-  // DOCTOR DASHBOARD
-  // ═══════════════════════════════════════════════════════════
+ // DOCTOR DASHBOARD
+// ═══════════════════════════════════════════════════════════
 
-  if (page === "doctor") return (
+if (page === "doctor") {
+  // 🔍 শুধুমাত্র কারেন্ট ডক্টরের জন্য অ্যাপয়েন্টমেন্টগুলো ফিল্টার করে নেওয়া হচ্ছে
+  const myLiveAppointments = appointments.filter(
+    (app) => app.doctor === currentUser?.name
+  );
+
+  return (
     <div className="min-h-screen bg-[#F0FBF9] font-['Nunito',sans-serif] flex">
       {/* Sidebar */}
       <aside className="w-64 bg-gradient-to-b from-teal-700 to-emerald-800 flex flex-col flex-shrink-0 min-h-screen shadow-2xl shadow-teal-900/30">
         <div className="p-6 border-b border-white/10">
           <div className="flex items-center gap-2.5 mb-5">
-  {/* Doctor Dashboard G-Care PNG Logo */}
-  <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
-    <img 
-      src={logoImg} 
-      alt="ZEE CARE Logo" 
-      className="w-full h-full object-contain" 
-    />
-  </div>
-  <div className="flex flex-col">
-    <span className="text-white font-black text-base leading-none">ZEE CARE</span>
-    <span className="text-[9px] font-bold text-teal-200/70 mt-0.5 tracking-wider">MEDITRACK CLIENT</span>
-  </div>
-</div>
+            {/* Doctor Dashboard G-Care PNG Logo */}
+            <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
+              <img 
+                src={logoImg} 
+                alt="ZEE CARE Logo" 
+                className="w-full h-full object-contain" 
+              />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-white font-black text-base leading-none">ZEE CARE</span>
+              <span className="text-[9px] font-bold text-teal-200/70 mt-0.5 tracking-wider">MEDITRACK CLIENT</span>
+            </div>
+          </div>
           <div className="bg-white/10 rounded-2xl p-4">
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
               <User className="w-5 h-5 text-white" />
@@ -635,63 +668,66 @@ export default function App() {
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
-  {[
-    { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
-    { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
-    // 👇 ঠিক এই নতুন লাইনটি নিচে যোগ হয়ে যাবে
-   { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: 0 },
-  ].map(item => (
-    <button
-      key={item.id}
-      onClick={() => setDoctorView(item.id)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-150 ${
-        doctorView === item.id
-          ? "bg-white text-teal-700 shadow-lg shadow-teal-900/20"
-          : "text-white/65 hover:bg-white/10 hover:text-white"
-      }`}
-    >
-      {item.icon}
-      <span className="flex-1 text-left">{item.label}</span>
-      <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-        doctorView === item.id ? "bg-teal-100 text-teal-600" : "bg-white/10 text-white/50"
-      }`}>
-        {item.badge}
-      </span>
-    </button>
-  ))}
-</nav>
+          {[
+            { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
+            { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
+            // এখানে শুধুমাত্র এই ডক্টরের লাইভ কাউন্ট শো করবে 👇
+            { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: myLiveAppointments.length },
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => setDoctorView(item.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-150 ${
+                doctorView === item.id
+                  ? "bg-white text-teal-700 shadow-lg shadow-teal-900/20"
+                  : "text-white/65 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {item.icon}
+              <span className="flex-1 text-left">{item.label}</span>
+              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                doctorView === item.id ? "bg-teal-100 text-teal-600" : "bg-white/10 text-white/50"
+              }`}>
+                {item.badge}
+              </span>
+            </button>
+          ))}
+        </nav>
 
-<div className="p-4 pt-0">
-  <div className="bg-white/5 rounded-2xl p-4 mb-3">
-    <div className="flex items-center gap-2 mb-2">
-      <BarChart3 className="w-3.5 h-3.5 text-white/40" />
-      <p className="text-white/40 text-xs font-['DM_Sans',sans-serif]">Today's Activity</p>
-    </div>
-    <p className="text-white font-black text-xl">
-      {typeof INIT_CALLS !== 'undefined' ? INIT_CALLS.length : 0} <span className="text-white/40 text-sm font-normal">calls assigned</span>
-    </p>
-  </div>
-  
-  <button
-    onClick={logout}
-    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:bg-white/10 hover:text-white text-sm font-bold transition-colors"
-  >
-    <LogOut className="w-4 h-4" />
-    Sign Out
-  </button>
-</div>
-</aside>
+        <div className="p-4 pt-0">
+          <div className="bg-white/5 rounded-2xl p-4 mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart3 className="w-3.5 h-3.5 text-white/40" />
+              <p className="text-white/40 text-xs font-['DM_Sans',sans-serif]">Today's Activity</p>
+            </div>
+            <p className="text-white font-black text-xl">
+              {typeof INIT_CALLS !== 'undefined' ? INIT_CALLS.length : 0} <span className="text-white/40 text-sm font-normal">calls assigned</span>
+            </p>
+          </div>
+          
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:bg-white/10 hover:text-white text-sm font-bold transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
       {/* Main content */}
       <main className="flex-1 overflow-auto">
         <header className="bg-white border-b border-teal-100 px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-teal-50">
           <div>
             <h1 className="text-xl font-black text-teal-900">
-              {doctorView === "patients" ? "Patient Overview" : "My Care Team"}
+              {doctorView === "patients" && "Patient Overview"}
+              {doctorView === "team" && "My Care Team"}
+              {doctorView === "appointments" && "Live Consultation Queue"}
             </h1>
             <p className="text-slate-400 text-sm font-['DM_Sans',sans-serif]">
-              {doctorView === "patients"
-                ? `${doctorPatients.length} patients under your care`
-                : `${INIT_TEAM.length} active team members assigned`}
+              {doctorView === "patients" && `${doctorPatients.length} patients under your care`}
+              {doctorView === "team" && `${INIT_TEAM.length} active team members assigned`}
+              {doctorView === "appointments" && `${myLiveAppointments.length} real-time active queue requests`}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -827,17 +863,17 @@ export default function App() {
               ))}
             </div>
           )}
-          {/* ── Appointments View ── */}
+
+          {/* ── Firebase Filtered Realtime Appointments View ── */}
           {doctorView === "appointments" && (
-            <AppointmentSection />
+            <AppointmentSection appointments={myLiveAppointments} />
           )}
           
         </div> 
       </main>
     </div>
   );
-       
-
+}
   // ═══════════════════════════════════════════════════════════
   // TEAM DASHBOARD
   // ═══════════════════════════════════════════════════════════
