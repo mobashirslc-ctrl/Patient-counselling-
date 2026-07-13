@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import logoImg from './components/figma/G-care final 2-01.png';
+import AppointmentSection from "./components/AppointmentSection";
 import {
   Heart, Users, Phone, FileText, CheckCircle, LogOut,
   Bell, Calendar, Clipboard, Activity, Search, Plus,
@@ -11,7 +12,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────
 
 type Page = "landing" | "login" | "doctor" | "team";
-type DoctorView = "patients" | "team";
+type DoctorView = "patients" | "team" | "appointments";
 type TeamView = "call-list" | "data-entry" | "patient-detail";
 
 // ─── Mock Data ────────────────────────────────────────────────
@@ -629,11 +630,12 @@ export default function App() {
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
-          {[
-            { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
-            { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
-          ].map(item => (
-            <button
+  {[
+    { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
+    { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
+    // 👇 ঠিক এই নতুন লাইনটি নিচে যোগ হয়ে যাবে
+    { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: 0 },
+  ].map(item => (
               key={item.id}
               onClick={() => setDoctorView(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-150 ${
@@ -815,10 +817,16 @@ export default function App() {
               ))}
             </div>
           )}
-        </div>
+          {/* ── Appointments View ── */}
+          {doctorView === "appointments" && (
+            <AppointmentSection />
+          )}
+          
+        </div> 
       </main>
     </div>
   );
+       
 
   // ═══════════════════════════════════════════════════════════
   // TEAM DASHBOARD
