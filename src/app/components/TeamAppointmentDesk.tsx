@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { ChevronRight, CheckCircle, AlertCircle, Plus, X, UserCheck, Paperclip, FileText } from "lucide-react";
 // db এবং Firestore ফাংশন ইম্পোর্ট
-import { db } from "../firebase";
+import { db } from "../../firebase";
 import { collection, addDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 interface AppointmentItem {
