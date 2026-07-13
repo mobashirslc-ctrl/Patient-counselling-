@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import logoImg from './components/figma/G-care final 2-01.png';
-import AppointmentSection from "./app/components/AppointmentSection";
+import AppointmentSection from "./components/AppointmentSection";
 import {
   Heart, Users, Phone, FileText, CheckCircle, LogOut,
   Bell, Calendar, Clipboard, Activity, Search, Plus,
