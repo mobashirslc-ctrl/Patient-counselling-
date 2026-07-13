@@ -129,30 +129,37 @@ export default function App() {
   
   // 🔄 ফায়ারবেস থেকে লাইভ ডাটা হোল্ড করার জন্য স্টেট (ডিফল্ট ফাঁকা অ্যারে)
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center font-bold text-slate-500">
+        Loading your G-Care Dashboard...
+      </div>
+    );
+  }
 
   // ─── 🔥 FIREBASE REALTIME LISTENER ADDED HERE ───
   useEffect(() => {
-    // টিম ডেস্ক যে কালেকশনে ডাটা পাঠাচ্ছে (zee_care_appointments) সেটির কুয়েরি তৈরি
-    const q = query(
-      collection(db, "zee_care_appointments"), 
-      orderBy("createdAt", "desc")
-    );
-    
-    // অন-স্ন্যাপশট লিসেনার যা রিফ্রেশ ছাড়া রিয়েল-টাইমে ডাটা নিয়ে আসবে
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const appointmentsArray: any[] = [];
-      querySnapshot.forEach((doc) => {
-        appointmentsArray.push({ id: doc.id, ...doc.data() });
-      });
-      // লাইভ স্টেট আপডেট
-      setAppointments(appointmentsArray);
-    }, (error) => {
-      console.error("Firestore live fetch error:", error);
+  const q = query(
+    collection(db, "zee_care_appointments"), 
+    orderBy("createdAt", "desc")
+  );
+  
+  const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const appointmentsArray: any[] = [];
+    querySnapshot.forEach((doc) => {
+      appointmentsArray.push({ id: doc.id, ...doc.data() });
     });
+    
+    setAppointments(appointmentsArray);
+    setLoading(false); // ✅ ডেটা আসা মাত্রই লোডিং বন্ধ
+  }, (error) => {
+    console.error("Firestore live fetch error:", error);
+    setLoading(false); // ✅ এরর হলেও লোডিং বন্ধ করুন, নাহলে অ্যাপ আটকে থাকবে
+  });
 
-    // কম্পোনেন্ট আনমাউন্ট হলে কানেকশন বন্ধ করার জন্য
-    return () => unsubscribe();
-  }, []);
+  return () => unsubscribe();
+}, []);
   // ───────────────────────────────────────────────
 
   const login = () => {
