@@ -634,44 +634,48 @@ export default function App() {
     { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
     { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
     // 👇 ঠিক এই নতুন লাইনটি নিচে যোগ হয়ে যাবে
-    { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: 0 },
+   { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: 0 },
   ].map(item => (
     <button
-              key={item.id}
-              onClick={() => setDoctorView(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-150 ${
-                doctorView === item.id
-                  ? "bg-white text-teal-700 shadow-lg shadow-teal-900/20"
-                  : "text-white/65 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              {item.icon}
-              <span className="flex-1 text-left">{item.label}</span>
-              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${doctorView === item.id ? "bg-teal-100 text-teal-600" : "bg-white/10 text-white/50"}`}>
-                {item.badge}
-              </span>
-            </button>
-          ))}
-        </nav>
+      key={item.id}
+      onClick={() => setDoctorView(item.id)}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-150 ${
+        doctorView === item.id
+          ? "bg-white text-teal-700 shadow-lg shadow-teal-900/20"
+          : "text-white/65 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      {item.icon}
+      <span className="flex-1 text-left">{item.label}</span>
+      <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+        doctorView === item.id ? "bg-teal-100 text-teal-600" : "bg-white/10 text-white/50"
+      }`}>
+        {item.badge}
+      </span>
+    </button>
+  ))}
+</nav>
 
-        <div className="p-4 pt-0">
-          <div className="bg-white/5 rounded-2xl p-4 mb-3">
-            <div className="flex items-center gap-2 mb-2">
-              <BarChart3 className="w-3.5 h-3.5 text-white/40" />
-              <p className="text-white/40 text-xs font-['DM_Sans',sans-serif]">Today's Activity</p>
-            </div>
-            <p className="text-white font-black text-xl">{INIT_CALLS.length} <span className="text-white/40 text-sm font-normal">calls assigned</span></p>
-          </div>
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:bg-white/10 hover:text-white text-sm font-bold transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
-        </div>
-      </aside>
-
+<div className="p-4 pt-0">
+  <div className="bg-white/5 rounded-2xl p-4 mb-3">
+    <div className="flex items-center gap-2 mb-2">
+      <BarChart3 className="w-3.5 h-3.5 text-white/40" />
+      <p className="text-white/40 text-xs font-['DM_Sans',sans-serif]">Today's Activity</p>
+    </div>
+    <p className="text-white font-black text-xl">
+      {typeof INIT_CALLS !== 'undefined' ? INIT_CALLS.length : 0} <span className="text-white/40 text-sm font-normal">calls assigned</span>
+    </p>
+  </div>
+  
+  <button
+    onClick={logout}
+    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:bg-white/10 hover:text-white text-sm font-bold transition-colors"
+  >
+    <LogOut className="w-4 h-4" />
+    Sign Out
+  </button>
+</div>
+</aside>
       {/* Main content */}
       <main className="flex-1 overflow-auto">
         <header className="bg-white border-b border-teal-100 px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-teal-50">
