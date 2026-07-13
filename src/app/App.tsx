@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import logoImg from './components/figma/G-care final 2-01.png';
 import AppointmentSection from "./components/AppointmentSection";
+import TeamAppointmentDesk from "./components/TeamAppointmentDesk";
 import {
   Heart, Users, Phone, FileText, CheckCircle, LogOut,
   Bell, Calendar, Clipboard, Activity, Search, Plus,
@@ -13,8 +14,7 @@ import {
 
 type Page = "landing" | "login" | "doctor" | "team";
 type DoctorView = "patients" | "team" | "appointments";
-type TeamView = "call-list" | "data-entry" | "patient-detail";
-
+type TeamView = "call-list" | "data-entry" | "patient-detail" | "appointments";
 // ─── Mock Data ────────────────────────────────────────────────
 
 const CREDS: Record<string, { password: string; role: "doctor" | "team"; name: string }> = {
@@ -121,6 +121,11 @@ export default function App() {
     doctorId: "", diagnosis: "", medications: "", nextFollowup: "", notes: "",
   });
   const [entrySuccess, setEntrySuccess] = useState(false);
+  const [appointments, setAppointments] = useState([
+    { id: 1, name: "Imran Hossain", doctor: "Dr. Farhan Ahmed", date: "14 Jul 2026", time: "10:00 AM", step: 0 },
+    { id: 2, name: "Moriom Begum", doctor: "Dr. Nusrat Jahan", date: "15 Jul 2026", time: "3:00 PM", step: 1 },
+    { id: 3, name: "Jahangir Alam", doctor: "Dr. Farhan Ahmed", date: "16 Jul 2026", time: "11:00 AM", step: 0 },
+  ]);
 
   const login = () => {
     const cred = CREDS[email];
@@ -1186,6 +1191,13 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {teamView === "appointments" && (
+  <TeamAppointmentDesk 
+    appointments={appointments} 
+    setAppointments={setAppointments} 
+  />
+)}
 
           {/* ── Patient Detail ── */}
           {teamView === "patient-detail" && selectedPatient && (
