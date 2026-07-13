@@ -139,26 +139,35 @@ export default function App() {
   }
 
   // ─── 🔥 FIREBASE REALTIME LISTENER ADDED HERE ───
-  useEffect(() => {
+useEffect(() => {
   const q = query(
     collection(db, "zee_care_appointments"), 
     orderBy("createdAt", "desc")
   );
+
+  // লোডিং স্ক্রিন আটকে থাকা বন্ধ করতে একটি সেফটি টাইমার
+  const timer = setTimeout(() => {
+    setLoading(false);
+  }, 5000); 
   
   const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    clearTimeout(timer); // ডেটা আসলে টাইমার বন্ধ হবে
     const appointmentsArray: any[] = [];
     querySnapshot.forEach((doc) => {
       appointmentsArray.push({ id: doc.id, ...doc.data() });
     });
-    
     setAppointments(appointmentsArray);
-    setLoading(false); // ✅ ডেটা আসা মাত্রই লোডিং বন্ধ
+    setLoading(false);
   }, (error) => {
+    clearTimeout(timer);
     console.error("Firestore live fetch error:", error);
-    setLoading(false); // ✅ এরর হলেও লোডিং বন্ধ করুন, নাহলে অ্যাপ আটকে থাকবে
+    setLoading(false);
   });
 
-  return () => unsubscribe();
+  return () => {
+    clearTimeout(timer);
+    unsubscribe();
+  };
 }, []);
   // ───────────────────────────────────────────────
 
