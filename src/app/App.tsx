@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db } from "./firebase"; // আপনার লোকাল কনফিগারেশন ফাইল
+import { db } from "../firebase"; // আপনার লোকাল কনফিগারেশন ফাইল
 
 // ইমেজ ও কম্পোনেন্ট ইমপোর্ট
 import logoImg from './components/figma/G-care final 2-01.png';
