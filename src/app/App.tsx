@@ -874,6 +874,7 @@ export default function App() {
           {[
             { id: "call-list" as TeamView, label: "Daily Call List", icon: <PhoneCall className="w-4 h-4" />, badge: pendingCalls, urgent: pendingCalls > 0 },
             { id: "data-entry" as TeamView, label: "Patient Data Entry", icon: <ClipboardList className="w-4 h-4" />, badge: null, urgent: false },
+      { id: "appointments" as TeamView, label: "Appointment Desk", icon: <Calendar className="w-4 h-4" />, badge: appointments.filter(a => a.step < 4).length },
           ].map(item => (
             <button
               key={item.id}
