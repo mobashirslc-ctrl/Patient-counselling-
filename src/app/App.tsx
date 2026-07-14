@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, query, orderBy, addDoc } from "firebase/firestore";
 import { db } from "../firebase"; // আপনার লোকাল কনফিগারেশন ফাইল
 
 // ইমেজ ও কম্পোনেন্ট ইমপোর্ট
@@ -23,7 +23,12 @@ type TeamView = "call-list" | "data-entry" | "patient-detail" | "appointments";
 // ─── Mock Data ────────────────────────────────────────────────
 
 const CREDS: Record<string, { password: string; role: "doctor" | "team"; name: string }> = {
-  "doctor@meditrack.com": { password: "doctor123", role: "doctor", name: "Dr. Farhan Ahmed" },
+  // আগের ইউজাররা...
+  "admin@gmail.com": { 
+      password: "admin123", 
+      role: "doctor", 
+      name: "Shahin Wadud" 
+  },
   "team@meditrack.com": { password: "team123", role: "team", name: "Sakib Hasan" },
 };
 
@@ -109,27 +114,55 @@ function InfoBlock({ label, value, icon }: { label: string; value: string; icon:
 // ─── App ──────────────────────────────────────────────────────
 
 export default function App() {
-  const [page, setPage] = useState<Page>("landing");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>(null);
-  const [doctorView, setDoctorView] = useState<DoctorView>("patients");
-  const [teamView, setTeamView] = useState<TeamView>("call-list");
-  const [patients, setPatients] = useState(INIT_PATIENTS);
-  const [callList, setCallList] = useState(INIT_CALLS);
-  const [callNotes, setCallNotes] = useState<Record<string, string>>({});
-  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [dataEntry, setDataEntry] = useState({
-    patientName: "", age: "", phone: "", address: "",
-    doctorId: "", diagnosis: "", medications: "", nextFollowup: "", notes: "",
-  });
-  const [entrySuccess, setEntrySuccess] = useState(false);
-  
-  // 🔄 ফায়ারবেস থেকে লাইভ ডাটা হোল্ড করার জন্য স্টেট (ডিফল্ট ফাঁকা অ্যারে)
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // --- ১. সব useState হুকস (শুরুতে) ---
+const [page, setPage] = useState<Page>("landing");
+const [appointments, setAppointments] = useState<any[]>([]); // একবারই থাকবে
+const [activeChamber, setActiveChamber] = useState("All");
+const [email, setEmail] = useState("");
+const [password, setPassword] = useState("");
+const [loginError, setLoginError] = useState("");
+const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>(null);
+const [doctorView, setDoctorView] = useState<DoctorView>("patients");
+const [teamView, setTeamView] = useState<TeamView>("call-list");
+const [patients, setPatients] = useState(INIT_PATIENTS);
+const [callList, setCallList] = useState(INIT_CALLS);
+const [callNotes, setCallNotes] = useState<Record<string, string>>({});
+const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+const [searchQuery, setSearchQuery] = useState("");
+const [loading, setLoading] = useState(true);
+
+// ২. ডাটা এন্ট্রির জন্য স্টেট (একবারই)
+const [dataEntry, setDataEntry] = useState({
+  patientName: "", age: "", phone: "", address: "",
+  doctorId: "", chamber: "", diagnosis: "", medications: "", 
+  nextFollowup: "", notes: "",
+});
+  // --- ২. useEffect হুক (শুরুতে) ---
+  useEffect(() => {
+    if (!db) {
+      console.error("Firebase DB is not initialized!");
+      setLoading(false);
+      return;
+    }
+
+    const q = query(collection(db, "zee_care_appointments"), orderBy("createdAt", "desc"));
+    const safetyTimer = setTimeout(() => { setLoading(false); }, 5000);
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      clearTimeout(safetyTimer);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAppointments(data);
+      setLoading(false);
+    }, (error) => {
+      clearTimeout(safetyTimer);
+      console.error("Firebase Error:", error.message);
+      setLoading(false);
+    });
+
+    return () => { clearTimeout(safetyTimer); unsubscribe(); };
+  }, []);
+
+  // --- ৩. কন্ডিশনাল রিটার্ন (হুকসের পর) ---
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center font-bold text-slate-500">
@@ -138,39 +171,7 @@ export default function App() {
     );
   }
 
-  // ─── 🔥 FIREBASE REALTIME LISTENER ADDED HERE ───
-useEffect(() => {
-  const q = query(
-    collection(db, "zee_care_appointments"), 
-    orderBy("createdAt", "desc")
-  );
-
-  // লোডিং স্ক্রিন আটকে থাকা বন্ধ করতে একটি সেফটি টাইমার
-  const timer = setTimeout(() => {
-    setLoading(false);
-  }, 5000); 
-  
-  const unsubscribe = onSnapshot(q, (querySnapshot) => {
-    clearTimeout(timer); // ডেটা আসলে টাইমার বন্ধ হবে
-    const appointmentsArray: any[] = [];
-    querySnapshot.forEach((doc) => {
-      appointmentsArray.push({ id: doc.id, ...doc.data() });
-    });
-    setAppointments(appointmentsArray);
-    setLoading(false);
-  }, (error) => {
-    clearTimeout(timer);
-    console.error("Firestore live fetch error:", error);
-    setLoading(false);
-  });
-
-  return () => {
-    clearTimeout(timer);
-    unsubscribe();
-  };
-}, []);
-  // ───────────────────────────────────────────────
-
+  // --- ৪. ফাংশনস এবং লজিক ---
   const login = () => {
     const cred = CREDS[email];
     if (cred && cred.password === password) {
@@ -194,28 +195,28 @@ useEffect(() => {
     setCallList(prev => prev.map(c => c.id === callId ? { ...c, status: "completed" } : c));
   };
 
-  const submitDataEntry = () => {
-    if (!dataEntry.patientName || !dataEntry.doctorId || !dataEntry.phone) return;
-    const id = `P${String(patients.length + 1).padStart(3, "0")}`;
-    setPatients(prev => [...prev, {
-      id,
-      name: dataEntry.patientName,
-      doctorId: dataEntry.doctorId,
-      status: "New Patient",
-      lastFollowup: new Date().toISOString().split("T")[0],
-      condition: dataEntry.diagnosis || "Pending diagnosis",
-      phone: dataEntry.phone,
-      age: parseInt(dataEntry.age) || 0,
-      address: dataEntry.address,
-      nextFollowup: dataEntry.nextFollowup,
-      medications: dataEntry.medications.split(",").map(m => m.trim()).filter(Boolean),
-      teamNote: "New patient added via data entry on " + new Date().toLocaleDateString("en-GB"),
-    }]);
-    setDataEntry({ patientName: "", age: "", phone: "", address: "", doctorId: "", diagnosis: "", medications: "", nextFollowup: "", notes: "" });
-    setEntrySuccess(true);
-    setTimeout(() => setEntrySuccess(false), 4000);
-  };
-
+  const submitDataEntry = async () => {
+  try {
+    if (!dataEntry.patientName || !dataEntry.doctorId || !dataEntry.chamber) {
+      alert("Please select Doctor and Chamber!");
+      return;
+    }
+    
+    const colRef = collection(db, "zee_care_appointments");
+    await addDoc(colRef, {
+      patientName: dataEntry.patientName,
+      doctor: dataEntry.doctorId,
+      chamber: dataEntry.chamber, // নতুন ডাটা সেভ হবে
+      createdAt: new Date(),
+      status: "pending", // স্ট্যাটাস যোগ করা ভালো
+      // অন্যান্য ফিল্ড...
+    });
+    
+    alert("সফলভাবে অ্যাপয়েন্টমেন্ট সেভ হয়েছে!");
+  } catch (error) {
+    console.error("Error:", error);
+  }
+};
   const doctorPatients = patients.filter(p => p.doctorId === "D001");
   const filtered = doctorPatients.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -650,10 +651,15 @@ useEffect(() => {
 // ═══════════════════════════════════════════════════════════
 
 if (page === "doctor") {
+  if (!appointments) {
+    return <div>Loading...</div>;
+  }
   // 🔍 শুধুমাত্র কারেন্ট ডক্টরের জন্য অ্যাপয়েন্টমেন্টগুলো ফিল্টার করে নেওয়া হচ্ছে
-  const myLiveAppointments = appointments.filter(
-    (app) => app.doctor === currentUser?.name
-  );
+  const myLiveAppointments = appointments.filter((app) => {
+  const isMyPatient = app.doctor === currentUser?.name;
+  const isChamberMatch = activeChamber === "All" || app.chamber === activeChamber;
+  return isMyPatient && isChamberMatch;
+});
 
   return (
     <div className="min-h-screen bg-[#F0FBF9] font-['Nunito',sans-serif] flex">
@@ -756,6 +762,27 @@ if (page === "doctor") {
             </div>
           </div>
         </header>
+        {/* আপনার দেওয়া নতুন কোডটি ঠিক এইখানে বসবে */}
+  {doctorView === "appointments" && (
+    <div className="bg-white px-8 py-3 border-b border-teal-50 flex items-center gap-3">
+      <span className="text-xs font-black text-teal-800 uppercase tracking-widest mr-2">Select Chamber:</span>
+      {["All", "Chamber A", "Chamber B"].map((chamber) => (
+        <button
+          key={chamber}
+          onClick={() => setActiveChamber(chamber)}
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            activeChamber === chamber 
+              ? "bg-teal-600 text-white shadow-md" 
+              : "bg-teal-50 text-teal-700 hover:bg-teal-100"
+          }`}
+        >
+          {chamber}
+        </button>
+      ))}
+    </div>
+  )}
+
+        
 
         <div className="p-8">
           {/* ── Patients View ── */}
@@ -880,9 +907,23 @@ if (page === "doctor") {
             </div>
           )}
 
-          {/* ── Firebase Filtered Realtime Appointments View ── */}
+{/* ── Firebase Filtered Realtime Appointments View ── */}
           {doctorView === "appointments" && (
-            <AppointmentSection appointments={myLiveAppointments} />
+            (() => {
+              const filteredAppointments = activeChamber === "All" 
+                ? myLiveAppointments 
+                : myLiveAppointments.filter(apt => apt.chamber === activeChamber);
+
+              return (
+                filteredAppointments.length > 0 ? (
+                  <AppointmentSection appointments={filteredAppointments} />
+                ) : (
+                  <div className="p-8 text-center text-slate-400">
+                    No appointments found for {activeChamber}.
+                  </div>
+                )
+              );
+            })()
           )}
           
         </div> 
@@ -1191,6 +1232,19 @@ if (page === "doctor") {
                       </p>
                     )}
                   </div>
+                  <div className="col-span-2">
+  <label className="block text-sm font-black text-slate-700 mb-1.5">Select Chamber</label>
+  <select
+    value={dataEntry.chamber}
+    onChange={e => setDataEntry(p => ({ ...p, chamber: e.target.value }))}
+    className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-indigo-400 bg-white"
+  >
+    <option value="">Select Chamber...</option>
+    <option value="Chamber A">Dhanmondi Chamber</option>
+    <option value="Chamber B">Gulshan Chamber</option>
+  </select>
+</div>
+                  
                   <div className="col-span-2">
                     <label className="block text-sm font-black text-slate-700 mb-1.5">Diagnosis / Condition</label>
                     <input

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ChevronRight, CheckCircle, AlertCircle, Plus, X, UserCheck, Paperclip, FileText } from "lucide-react";
 // db এবং Firestore ফাংশন ইম্পোর্ট
 import { db } from "../../firebase";
-import { collection, addDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
 
 interface AppointmentItem {
   id: string;
@@ -43,6 +43,7 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
     condition: "Normal" as "Normal" | "Urgent" | "Critical",
     documentUrl: "",
     teamNotes: "",
+    chamber: "",
   });
 
   // ☁️ Cloudinary File Upload Handler (সম্পূর্ণ লজিক)
@@ -89,12 +90,17 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
   // 🔥 Firebase Firestore-এ ডেটা পাঠানো
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.date || !formData.time || !formData.phone) return;
+    // এখানে chamber ভ্যালিডেশন চেক করুন যদি প্রয়োজন হয়
+    if (!formData.name || !formData.date || !formData.time || !formData.phone || !formData.chamber) {
+      alert("Please fill all required fields, including Chamber.");
+      return;
+    }
 
     try {
       await addDoc(collection(db, "zee_care_appointments"), {
         name: formData.name,
         doctor: formData.doctor,
+        chamber: formData.chamber, // নতুন ফিল্ডটি যোগ করা হলো
         date: new Date(formData.date).toLocaleDateString("en-GB", {
           day: "numeric",
           month: "short",
@@ -112,14 +118,23 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
         condition: formData.condition,
         documentUrl: formData.documentUrl,
         teamNotes: formData.teamNotes,
-        createdAt: new Date().getTime() // শর্টিং এর জন্য টাইমস্ট্যাম্প
+        createdAt: new Date().getTime() 
       });
 
-      // ফর্ম রিসেট
+      // ফর্ম রিসেট (chamber সহ)
       setFormData({ 
-        name: "", doctor: "Dr. Farhan Ahmed", date: "", time: "", 
-        age: "", phone: "", chiefComplaint: "", vitalSigns: "",
-        condition: "Normal", documentUrl: "", teamNotes: ""
+        name: "", 
+        doctor: "Dr. Farhan Ahmed", 
+        chamber: "", // এখানে রিসেট ফিল্ড যোগ করুন
+        date: "", 
+        time: "", 
+        age: "", 
+        phone: "", 
+        chiefComplaint: "", 
+        vitalSigns: "",
+        condition: "Normal", 
+        documentUrl: "", 
+        teamNotes: ""
       });
       setIsOpen(false);
     } catch (error) {
@@ -267,6 +282,19 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
                       <option value="Dr. Nusrat Jahan">Dr. Nusrat Jahan</option>
                     </select>
                   </div>
+                  <div>
+    <label className="block text-[11px] font-bold text-slate-600 mb-1">Assign Chamber</label>
+    <select 
+      value={formData.chamber} 
+      onChange={e => setFormData({ ...formData, chamber: e.target.value })} 
+      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500"
+      required
+    >
+      <option value="">Select Chamber</option>
+      <option value="Chamber A">Chamber A</option>
+      <option value="Chamber B">Chamber B</option>
+    </select>
+  </div>
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Patient Condition</label>
                     <select value={formData.condition} onChange={e => setFormData({ ...formData, condition: e.target.value as any })} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500">
