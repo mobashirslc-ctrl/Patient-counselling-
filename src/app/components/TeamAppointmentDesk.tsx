@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ChevronRight, CheckCircle, AlertCircle, Plus, X, UserCheck, Paperclip, FileText } from "lucide-react";
 // db এবং Firestore ফাংশন ইম্পোর্ট
 import { db } from "../../firebase";
-import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
-
+import { collection, addDoc, doc, updateDoc, getDocs, query, where } from "firebase/firestore";
 interface AppointmentItem {
   id: string;
   name: string;
@@ -30,22 +29,49 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
   const [isOpen, setIsOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   
-  // ফর্ম স্টেট
-  const [formData, setFormData] = useState({
-    name: "",
-    doctor: "Dr. Farhan Ahmed",
-    date: "",
-    time: "",
-    age: "",
-    phone: "",
-    chiefComplaint: "",
-    vitalSigns: "",
-    condition: "Normal" as "Normal" | "Urgent" | "Critical",
-    documentUrl: "",
-    teamNotes: "",
-    chamber: "",
-  });
+  // ১. ডাক্তারদের লিস্টের স্টেট
+  const [onboardedDoctors, setOnboardedDoctors] = useState<any[]>([]);
+  const [selectedDoctorObj, setSelectedDoctorObj] = useState<any>(null);
 
+  // ২. ডাক্তারদের লিস্ট ফেচ করার লজিক (অনবোর্ড করা ডাক্তারদের আনতে)
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        // ১. 'doctors' কালেকশন পরিবর্তন করে 'users' করা হলো
+        // ২. শুধুমাত্র ডাক্তারদের ফিল্টার করার জন্য 'where' শর্ত যোগ করা হলো
+        const q = query(
+          collection(db, "users"), 
+          where("role", "==", "doctor")
+        ); 
+        
+        const querySnapshot = await getDocs(q);
+        const doctors = querySnapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data() 
+        }));
+        
+        setOnboardedDoctors(doctors);
+      } catch (err) {
+        console.error("Error fetching doctors:", err);
+      }
+    };
+    fetchDoctors();
+  }, []);
+
+  const [formData, setFormData] = useState({
+  name: "",
+  doctor: "", // আগে এখানে নাম ছিল, এখন শুধু খালি স্ট্রিং "" রাখুন
+  date: "",
+  time: "",
+  age: "",
+  phone: "",
+  chiefComplaint: "",
+  vitalSigns: "",
+  condition: "Normal" as "Normal" | "Urgent" | "Critical",
+  documentUrl: "",
+  teamNotes: "",
+  chamber: "",
+});
   // ☁️ Cloudinary File Upload Handler (সম্পূর্ণ লজিক)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -88,60 +114,66 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
   };
 
   // 🔥 Firebase Firestore-এ ডেটা পাঠানো
+  // 🔥 Firebase Firestore-এ ডেটা পাঠানো
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // এখানে chamber ভ্যালিডেশন চেক করুন যদি প্রয়োজন হয়
-    if (!formData.name || !formData.date || !formData.time || !formData.phone || !formData.chamber) {
-      alert("Please fill all required fields, including Chamber.");
-      return;
-    }
+  e.preventDefault();
+  
+  // ১. ভ্যালিডেশনে doctor যোগ করা হয়েছে
+  if (!formData.name || !formData.date || !formData.time || !formData.phone || !formData.chamber || !formData.doctor) {
+    alert("Please fill all required fields, including Doctor and Chamber.");
+    return;
+  }
 
-    try {
-      await addDoc(collection(db, "zee_care_appointments"), {
-        name: formData.name,
-        doctor: formData.doctor,
-        chamber: formData.chamber, // নতুন ফিল্ডটি যোগ করা হলো
-        date: new Date(formData.date).toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-          year: "numeric"
-        }),
-        time: new Date(`2000-01-01T${formData.time}`).toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        step: 0,
-        age: formData.age,
-        phone: formData.phone,
-        chiefComplaint: formData.chiefComplaint,
-        vitalSigns: formData.vitalSigns,
-        condition: formData.condition,
-        documentUrl: formData.documentUrl,
-        teamNotes: formData.teamNotes,
-        createdAt: new Date().getTime() 
-      });
+  try {
+    console.log("Saving to DB, Chamber value is:", formData.chamber);
+    await addDoc(collection(db, "zee_care_appointments"), {
+      name: formData.name,
+      doctor: formData.doctor,      
+      chamber: formData.chamber,    
+      status: "confirmed",          
+      date: new Date(formData.date).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric"
+      }),
+      time: new Date(`2000-01-01T${formData.time}`).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      step: 0,
+      age: formData.age,
+      phone: formData.phone,
+      chiefComplaint: formData.chiefComplaint,
+      vitalSigns: formData.vitalSigns,
+      condition: formData.condition,
+      documentUrl: formData.documentUrl,
+      teamNotes: formData.teamNotes,
+      createdAt: new Date().getTime() 
+    });
 
-      // ফর্ম রিসেট (chamber সহ)
-      setFormData({ 
-        name: "", 
-        doctor: "Dr. Farhan Ahmed", 
-        chamber: "", // এখানে রিসেট ফিল্ড যোগ করুন
-        date: "", 
-        time: "", 
-        age: "", 
-        phone: "", 
-        chiefComplaint: "", 
-        vitalSigns: "",
-        condition: "Normal", 
-        documentUrl: "", 
-        teamNotes: ""
-      });
-      setIsOpen(false);
-    } catch (error) {
-      console.error("Error adding to Firebase:", error);
-      alert("Database sync failed!");
-    }
-  };
+    // ২. ফর্ম রিসেট
+    setFormData({ 
+      name: "", 
+      doctor: "", 
+      chamber: "", 
+      date: "", 
+      time: "", 
+      age: "", 
+      phone: "", 
+      chiefComplaint: "", 
+      vitalSigns: "",
+      condition: "Normal", 
+      documentUrl: "", 
+      teamNotes: ""
+    });
+    
+    setIsOpen(false);
+    alert("Appointment confirmed and synced to Doctor Desk!"); 
+  } catch (error) {
+    console.error("Error adding to Firebase:", error);
+    alert("Database sync failed!");
+  }
+};
 
   const getBadgeColor = (cond: string) => {
     if (cond === "Critical") return "bg-rose-100 text-rose-700 border-rose-200";
@@ -276,24 +308,31 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Assign Doctor</label>
-                    <select value={formData.doctor} onChange={e => setFormData({ ...formData, doctor: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500">
-                      <option value="Dr. Farhan Ahmed">Dr. Farhan Ahmed</option>
-                      <option value="Dr. Nusrat Jahan">Dr. Nusrat Jahan</option>
-                    </select>
-                  </div>
+  <label className="block text-[11px] font-bold text-slate-600 mb-1">Assign Doctor</label>
+  <select 
+    value={formData.doctor} 
+    onChange={e => setFormData({ ...formData, doctor: e.target.value })} 
+    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500"
+    required
+  >
+    <option value="">Select Doctor</option>
+    {onboardedDoctors.map((doc) => (
+      <option key={doc.id} value={doc.name}>{doc.name}</option>
+    ))}
+  </select>
+</div>
                   <div>
     <label className="block text-[11px] font-bold text-slate-600 mb-1">Assign Chamber</label>
     <select 
-      value={formData.chamber} 
-      onChange={e => setFormData({ ...formData, chamber: e.target.value })} 
-      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500"
-      required
-    >
-      <option value="">Select Chamber</option>
-      <option value="Chamber A">Chamber A</option>
-      <option value="Chamber B">Chamber B</option>
-    </select>
+  value={formData.chamber} 
+  onChange={(e) => setFormData({...formData, chamber: e.target.value})}
+  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500"
+  required
+>
+  <option value="">Select Chamber</option>
+  <option value="Japan Bangladesh Hospital">Japan Bangladesh Hospital</option>
+  <option value="Millenium hospital">Millenium hospital</option>
+</select>
   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Patient Condition</label>

@@ -33,8 +33,12 @@ const CREDS: Record<string, { password: string; role: "doctor" | "team"; name: s
 };
 
 const DOCTORS = [
-  { id: "D001", name: "Dr. Farhan Ahmed", specialty: "Cardiology" },
-  { id: "D002", name: "Dr. Nusrat Jahan", specialty: "Diabetology" },
+  { 
+    id: "D001", 
+    name: "Dr. Shahin Wadud", 
+    specialty: "Cardiology",
+    chambers: ["Japan Bangladesh Hospital", "Millenium hospital"] // এই ফিল্ডটি থাকা জরুরি
+  },
 ];
 
 const INIT_PATIENTS = [
@@ -115,9 +119,14 @@ function InfoBlock({ label, value, icon }: { label: string; value: string; icon:
 
 export default function App() {
   // --- ১. সব useState হুকস (শুরুতে) ---
+  const [entrySuccess, setEntrySuccess] = useState(false);
 const [page, setPage] = useState<Page>("landing");
 const [appointments, setAppointments] = useState<any[]>([]); // একবারই থাকবে
+
 const [activeChamber, setActiveChamber] = useState("All");
+const [currentDoctor, setCurrentDoctor] = useState(
+  DOCTORS.find(d => d.name === "Dr. Shahin Wadud") || DOCTORS[0]
+);
 const [email, setEmail] = useState("");
 const [password, setPassword] = useState("");
 const [loginError, setLoginError] = useState("");
@@ -131,6 +140,7 @@ const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 const [searchQuery, setSearchQuery] = useState("");
 const [loading, setLoading] = useState(true);
 
+
 // ২. ডাটা এন্ট্রির জন্য স্টেট (একবারই)
 const [dataEntry, setDataEntry] = useState({
   patientName: "", age: "", phone: "", address: "",
@@ -138,30 +148,48 @@ const [dataEntry, setDataEntry] = useState({
   nextFollowup: "", notes: "",
 });
   // --- ২. useEffect হুক (শুরুতে) ---
-  useEffect(() => {
-    if (!db) {
-      console.error("Firebase DB is not initialized!");
-      setLoading(false);
-      return;
-    }
+useEffect(() => {
+  const q = collection(db, "zee_care_appointments");
+  const safetyTimer = setTimeout(() => { 
+    if (typeof setLoading === 'function') setLoading(false); 
+  }, 5000);
 
-    const q = query(collection(db, "zee_care_appointments"), orderBy("createdAt", "desc"));
-    const safetyTimer = setTimeout(() => { setLoading(false); }, 5000);
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      clearTimeout(safetyTimer);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAppointments(data);
-      setLoading(false);
-    }, (error) => {
-      clearTimeout(safetyTimer);
-      console.error("Firebase Error:", error.message);
-      setLoading(false);
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    // ডাটা ম্যাপ করা এবং chamber ফিল্ড নিশ্চিত করা
+    const data = snapshot.docs.map(doc => {
+      const docData = doc.data();
+      return { 
+        id: doc.id, 
+        ...docData,
+        chamber: docData.chamber || "Unknown"
+      };
+    });
+    
+    console.log("সব ডাটা (chamber সহ):", data); 
+    
+    // সর্টিং লজিক
+    const sortedData = [...data].sort((a: any, b: any) => {
+      const dateA = a.createdAt?.seconds ? a.createdAt.seconds : (a.createdAt || 0);
+      const dateB = b.createdAt?.seconds ? b.createdAt.seconds : (b.createdAt || 0);
+      return dateB - dateA; 
     });
 
-    return () => { clearTimeout(safetyTimer); unsubscribe(); };
-  }, []);
+    // স্টেট আপডেট
+    if (typeof setAppointments === 'function') setAppointments(sortedData);
+    if (typeof setLoading === 'function') setLoading(false);
+    
+    clearTimeout(safetyTimer);
+  }, (error) => {
+    clearTimeout(safetyTimer);
+    console.error("Firebase Error:", error.message);
+    if (typeof setLoading === 'function') setLoading(false);
+  });
 
+  return () => { 
+    clearTimeout(safetyTimer); 
+    unsubscribe(); 
+  };
+}, []); // dependencies এরর দিলে এখানে [] ই রাখুন
   // --- ৩. কন্ডিশনাল রিটার্ন (হুকসের পর) ---
   if (loading) {
     return (
@@ -196,25 +224,36 @@ const [dataEntry, setDataEntry] = useState({
   };
 
   const submitDataEntry = async () => {
+  // ১. ভ্যালিডেশন চেক
+  if (!dataEntry.patientName || !dataEntry.doctorId || !dataEntry.chamber) {
+    alert("Please select Doctor and Chamber!");
+    return;
+  }
+  
   try {
-    if (!dataEntry.patientName || !dataEntry.doctorId || !dataEntry.chamber) {
-      alert("Please select Doctor and Chamber!");
-      return;
-    }
-    
+    setLoading(true); // লোডিং শুরু (যদি আপনার লোডিং স্টেট থাকে)
+
     const colRef = collection(db, "zee_care_appointments");
     await addDoc(colRef, {
-      patientName: dataEntry.patientName,
+      name: dataEntry.patientName, // ডাটাবেসের ফিল্ডের নাম খেয়াল রাখবেন (name নাকি patientName?)
       doctor: dataEntry.doctorId,
-      chamber: dataEntry.chamber, // নতুন ডাটা সেভ হবে
+      chamber: dataEntry.chamber,
       createdAt: new Date(),
-      status: "pending", // স্ট্যাটাস যোগ করা ভালো
-      // অন্যান্য ফিল্ড...
+      status: "pending", 
     });
     
-    alert("সফলভাবে অ্যাপয়েন্টমেন্ট সেভ হয়েছে!");
+    // ২. সাকসেস মেসেজ ট্রিকার করা
+    setEntrySuccess(true); 
+    setTimeout(() => setEntrySuccess(false), 3000); 
+
+    // ৩. ফর্ম রিসেট করা (অপশনাল কিন্তু দরকারি)
+    // setDataEntry({ patientName: "", doctorId: "", chamber: "" }); 
+    
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error saving data:", error);
+    alert("ডাটা সেভ করতে সমস্যা হয়েছে!");
+  } finally {
+    setLoading(false); // লোডিং শেষ
   }
 };
   const doctorPatients = patients.filter(p => p.doctorId === "D001");
@@ -333,22 +372,24 @@ const [dataEntry, setDataEntry] = useState({
                   Live
                 </span>
               </div>
-              {[
-                { name: "Rahim Uddin", status: "Stable", note: "BP improved — following diet plan", time: "10:30 AM", dot: "bg-emerald-400" },
-                { name: "Fatema Begum", status: "Critical", note: "Breathing difficulty — urgent review", time: "9:15 AM", dot: "bg-red-400" },
-                { name: "Karim Molla", status: "Due", note: "Missed 2 calls — rescheduled today", time: "8:45 AM", dot: "bg-amber-400" },
-              ].map((p, i) => (
-                <div key={i} className="flex items-start gap-3 py-3.5 border-b border-white/10 last:border-0">
-                  <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${p.dot}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-bold text-white text-sm">{p.name}</p>
-                      <span className="text-white/35 text-xs flex-shrink-0 font-['DM_Sans',sans-serif]">{p.time}</span>
-                    </div>
-                    <p className="text-white/55 text-xs mt-0.5 font-['DM_Sans',sans-serif] leading-relaxed">{p.note}</p>
-                  </div>
-                </div>
-              ))}
+             {appointments.slice(0, 3).map((p: any) => (
+  <div key={p.id} className="flex items-start gap-3 py-3.5 border-b border-white/10 last:border-0">
+    {/* কন্ডিশনাল ডট কালার */}
+    <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${p.status === 'Critical' ? 'bg-red-400' : p.status === 'Due' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+    
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-bold text-white text-sm">{p.name}</p>
+        <span className="text-white/35 text-xs flex-shrink-0 font-['DM_Sans',sans-serif]">
+          {p.time || "N/A"}
+        </span>
+      </div>
+      <p className="text-white/55 text-xs mt-0.5 font-['DM_Sans',sans-serif] leading-relaxed">
+        {p.chiefComplaint || "No notes available"}
+      </p>
+    </div>
+  </div>
+))}
               <div className="mt-5 grid grid-cols-3 gap-3">
                 {[
                   { label: "Patients", value: "24", color: "text-emerald-300" },
@@ -655,10 +696,12 @@ if (page === "doctor") {
     return <div>Loading...</div>;
   }
   // 🔍 শুধুমাত্র কারেন্ট ডক্টরের জন্য অ্যাপয়েন্টমেন্টগুলো ফিল্টার করে নেওয়া হচ্ছে
-  const myLiveAppointments = appointments.filter((app) => {
+const myLiveAppointments = appointments.filter((app) => {
   const isMyPatient = app.doctor === currentUser?.name;
   const isChamberMatch = activeChamber === "All" || app.chamber === activeChamber;
-  return isMyPatient && isChamberMatch;
+  const isConfirmed = app.status === "confirmed"; // এই লাইনটি যোগ করুন
+  
+  return isMyPatient && isChamberMatch && isConfirmed; // এখানেও এটি যোগ করে দিন
 });
 
   return (
@@ -764,24 +807,36 @@ if (page === "doctor") {
         </header>
         {/* আপনার দেওয়া নতুন কোডটি ঠিক এইখানে বসবে */}
   {doctorView === "appointments" && (
-    <div className="bg-white px-8 py-3 border-b border-teal-50 flex items-center gap-3">
-      <span className="text-xs font-black text-teal-800 uppercase tracking-widest mr-2">Select Chamber:</span>
-      {["All", "Chamber A", "Chamber B"].map((chamber) => (
-        <button
-          key={chamber}
-          onClick={() => setActiveChamber(chamber)}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-            activeChamber === chamber 
-              ? "bg-teal-600 text-white shadow-md" 
-              : "bg-teal-50 text-teal-700 hover:bg-teal-100"
-          }`}
-        >
-          {chamber}
-        </button>
-      ))}
-    </div>
-  )}
+  <div className="bg-white px-8 py-3 border-b border-teal-50 flex items-center gap-3">
+    <span className="text-xs font-black text-teal-800 uppercase tracking-widest mr-2">Select Chamber:</span>
+    
+    {/* "All" বাটন সবসময় থাকবে */}
+    <button
+      onClick={() => setActiveChamber("All")}
+      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+        activeChamber === "All" ? "bg-teal-600 text-white shadow-md" : "bg-teal-50 text-teal-700 hover:bg-teal-100"
+      }`}
+    >
+      All
+    </button>
 
+    {/* ডাক্তারের ডাটা থেকে চেম্বার ম্যাপ করা */}
+    {/* এখানে 'currentDoctor' ভ্যারিয়েবলটি আপনার লগ-ইন করা ডাক্তারের ডাটা হোল্ড করছে ধরে নেওয়া হয়েছে */}
+    {currentDoctor?.chambers?.map((chamber: string) => (
+      <button
+        key={chamber}
+        onClick={() => setActiveChamber(chamber)}
+        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+          activeChamber === chamber 
+            ? "bg-teal-600 text-white shadow-md" 
+            : "bg-teal-50 text-teal-700 hover:bg-teal-100"
+        }`}
+      >
+        {chamber}
+      </button>
+    ))}
+  </div>
+)}
         
 
         <div className="p-8">
@@ -908,24 +963,29 @@ if (page === "doctor") {
           )}
 
 {/* ── Firebase Filtered Realtime Appointments View ── */}
+        
           {doctorView === "appointments" && (
             (() => {
-              const filteredAppointments = activeChamber === "All" 
-                ? myLiveAppointments 
-                : myLiveAppointments.filter(apt => apt.chamber === activeChamber);
+              // স্টেটের নাম 'appointments' যদি হয় তবে এটাই রাখুন
+              const dataToFilter = appointments || []; 
 
-              return (
-                filteredAppointments.length > 0 ? (
-                  <AppointmentSection appointments={filteredAppointments} />
-                ) : (
-                  <div className="p-8 text-center text-slate-400">
-                    No appointments found for {activeChamber}.
-                  </div>
-                )
+              const filtered = activeChamber === "All" 
+                ? dataToFilter 
+                : dataToFilter.filter((apt) => 
+                    String(apt.chamber || "").trim().toLowerCase() === activeChamber.trim().toLowerCase()
+                  );
+
+              console.log("ফিল্টার করা ডাটা:", filtered);
+
+              return filtered.length > 0 ? (
+                <AppointmentSection appointments={filtered} />
+              ) : (
+                <div className="p-8 text-center text-slate-400">
+                  No appointments found for {activeChamber}.
+                </div>
               );
             })()
           )}
-          
         </div> 
       </main>
     </div>
@@ -1240,8 +1300,8 @@ if (page === "doctor") {
     className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-indigo-400 bg-white"
   >
     <option value="">Select Chamber...</option>
-    <option value="Chamber A">Dhanmondi Chamber</option>
-    <option value="Chamber B">Gulshan Chamber</option>
+    <option value="Japan Bangladesh Hospital">Dhanmondi Chamber</option>
+    <option value="Millenium hospital">Sutrapur Chamber</option>
   </select>
 </div>
                   

@@ -22,35 +22,23 @@ const STATUS_COLORS = {
   Cancelled: "bg-rose-50 text-rose-700 border-rose-200",
 };
 
-export default function AppointmentSection() {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+export default function AppointmentSection({ appointments, onPatientClick }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("All");
 
-  useEffect(() => {
-    const q = query(collection(db, "zee_care_appointments"), orderBy("date", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Appointment[];
-      setAppointments(data);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleStatusChange = async (id: string, newStatus: Appointment["status"]) => {
-    try {
-      const appointmentRef = doc(db, "zee_care_appointments", id);
-      await updateDoc(appointmentRef, { status: newStatus });
-    } catch (error) {
-      console.error("Error updating status: ", error);
-    }
-  };
+  // এখানে আর useEffect বা অতিরিক্ত useState রাখার দরকার নেই,
+  // কারণ ডাটা প্রপস হিসেবে আসছে।
+  
 
   const filteredAppointments = appointments.filter(apt => {
-    const matchesSearch = apt.name?.toLowerCase().includes(search.toLowerCase()) || apt.id?.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = apt.name?.toLowerCase().includes(search.toLowerCase()) || 
+                          apt.id?.toLowerCase().includes(search.toLowerCase());
+    
     const matchesFilter = filterStatus === "All" || apt.status === filterStatus;
+    
+    // ডাটা যেহেতু App.tsx থেকে ফিল্টার হয়ে আসছে, এখানে শুধু সার্চ ও স্ট্যাটাস ফিল্টার রাখুন
     return matchesSearch && matchesFilter;
   });
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-white p-4 rounded-2xl border border-teal-50 shadow-sm">
@@ -82,7 +70,16 @@ export default function AppointmentSection() {
 
       <div className="space-y-3">
         {filteredAppointments.map(apt => (
-          <div key={apt.id} className="bg-white rounded-2xl p-5 border border-teal-50 hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div key={apt.id} 
+          onClick={() => {
+    // এখানে সরাসরি চেক করছি
+    if (onPatientClick) {
+      onPatientClick(apt);
+    } else {
+      console.error("onPatientClick প্রপসটি পাওয়া যায়নি!");
+    }
+  }}
+          className="bg-white rounded-2xl p-5 border border-teal-50 hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
                 <User className="w-5 h-5" />
