@@ -174,7 +174,7 @@ useEffect(() => {
       return dateB - dateA; 
     });
 
-    // স্টেট আপডেট
+    // স্টেট আপডেটgit add .
     if (typeof setAppointments === 'function') setAppointments(sortedData);
     if (typeof setLoading === 'function') setLoading(false);
     
@@ -495,7 +495,8 @@ useEffect(() => {
             {[
               {
                 step: "01", title: "Admin Sets Up",
-                desc: "Admin creates doctor and team accounts, assigns daily call lists, and controls all platform access.",
+                desc: "Admin creates 
+                and team accounts, assigns daily call lists, and controls all platform access.",
                 icon: <Shield className="w-7 h-7" />, grad: "from-yellow-400 to-orange-500",
               },
               {
@@ -978,7 +979,10 @@ const myLiveAppointments = appointments.filter((app) => {
               console.log("ফিল্টার করা ডাটা:", filtered);
 
               return filtered.length > 0 ? (
-                <AppointmentSection appointments={filtered} />
+                <AppointmentSection 
+  appointments={filtered} 
+  onPatientClick={(apt) => setSelectedPatient(apt)} 
+/>
               ) : (
                 <div className="p-8 text-center text-slate-400">
                   No appointments found for {activeChamber}.
