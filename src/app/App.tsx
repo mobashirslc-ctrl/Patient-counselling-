@@ -26,7 +26,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────
 
 type Page = "landing" | "login" | "doctor" | "team";
-type DoctorView = "patients" | "team" | "appointments";
+type DoctorView = "patients" | "team" | "appointments" | "patient-detail";
 type TeamView = "call-list" | "data-entry" | "patient-detail" | "appointments";
 // ─── Mock Data ────────────────────────────────────────────────
 
@@ -155,69 +155,41 @@ const [dataEntry, setDataEntry] = useState({
   doctorId: "", chamber: "", diagnosis: "", medications: "", 
   nextFollowup: "", notes: "",
 });
-  useEffect(() => {
-  // ১. শুধুমাত্র নির্দিষ্ট ডাক্তারের অ্যাপয়েন্টমেন্ট আনতে কুয়েরি ফিল্টার যোগ করো
-  const q = query(
-    collection(db, "zee_care_appointments"),
-    where("doctor", "==", currentUser?.name) // এটি তোমার ডক্টরের নাম অনুযায়ী ফিল্টার করবে
+useEffect(() => {
+  if (!currentUser?.name) {
+    setLoading(false);
+    setAppointments([]);
+    setPatients([]);
+    return;
+  }
+
+  // ১. অ্যাপয়েন্টমেন্টের কুয়েরি (সঠিক কালেকশন নাম দিয়ে)
+  const qAppointments = query(
+    collection(db, "zee_care_appointments"), 
+    where("doctor", "==", "Dr. " + currentUser.name) // এখানে "Dr. " যোগ করা হলো
   );
 
-  const safetyTimer = setTimeout(() => { 
-    if (typeof setLoading === 'function') setLoading(false); 
-  }, 5000);
+  // ২. পেশেন্টের কুয়েরি
+  const qPatients = query(
+    collection(db, "patients"),
+    where("doctorName", "==", "D001")
+  );
 
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const data = snapshot.docs.map(doc => ({ 
-      id: doc.id, 
-      ...doc.data(),
-      chamber: doc.data().chamber || "Unknown"
-    }));
-    
-    // সর্টিং লজিক
-    const sortedData = [...data].sort((a: any, b: any) => {
-      const dateA = a.createdAt?.seconds || 0;
-      const dateB = b.createdAt?.seconds || 0;
-      return dateB - dateA; 
-    });
-
-    if (typeof setAppointments === 'function') setAppointments(sortedData);
-    if (typeof setLoading === 'function') setLoading(false);
-    
-    clearTimeout(safetyTimer);
-  }, (error) => {
-    clearTimeout(safetyTimer);
-    console.error("Firebase Error:", error.message);
-    if (typeof setLoading === 'function') setLoading(false);
+  const unsubAppts = onSnapshot(qAppointments, (snap) => {
+    setAppointments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    setLoading(false);
   });
 
-  return () => { 
-    clearTimeout(safetyTimer); 
-    unsubscribe(); 
+  const unsubPatients = onSnapshot(qPatients, (snap) => {
+    console.log("Patients data:", snap.docs.map(d => d.data()));
+    setPatients(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    setLoading(false);
+  });
+
+  return () => {
+    unsubAppts();
+    unsubPatients();
   };
-}, [currentUser?.name]); // ডিপেন্ডেন্সি অ্যারেতে currentUser যোগ করো
-// --- পেশেন্টদের জন্য নতুন useEffect ---
-useEffect(() => {
-  // নিশ্চিত করো যে currentUser এবং তার নাম ভ্যালিড আছে
-  if (!currentUser || !currentUser.name) return;
-
-  const unsubscribe = onSnapshot(
-    query(
-      collection(db, "patients"),
-      where("doctorName", "==", currentUser.name)
-    ), 
-    (snapshot) => {
-      const patientData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setPatients(patientData);
-    }, 
-    (error) => {
-      console.error("Firestore Error Details:", error);
-    }
-  );
-
-  return () => unsubscribe();
 }, [currentUser?.name]);
   if (loading) {
     return (
@@ -252,39 +224,52 @@ useEffect(() => {
   };
 
   const submitDataEntry = async () => {
-  // ১. ভ্যালিডেশন চেক
-  if (!dataEntry.patientName || !dataEntry.doctorId || !dataEntry.chamber) {
-    alert("Please select Doctor and Chamber!");
+  // ১. ভ্যালিডেশন চেক (স্টেটের নামের সাথে মিলিয়ে)
+  if (!dataEntry.patientName || !dataEntry.doctorId) {
+    alert("Please provide Name and Doctor ID/Name!");
     return;
   }
   
   try {
-    setLoading(true); // লোডিং শুরু (যদি আপনার লোডিং স্টেট থাকে)
+    setLoading(true);
 
-    const colRef = collection(db, "zee_care_appointments");
+    // 'patients' কালেকশনে ডাটা পাঠানো
+    const colRef = collection(db, "patients");
+    
     await addDoc(colRef, {
-      name: dataEntry.patientName, // ডাটাবেসের ফিল্ডের নাম খেয়াল রাখবেন (name নাকি patientName?)
-      doctor: dataEntry.doctorId,
-      chamber: dataEntry.chamber,
-      createdAt: new Date(),
-      status: "pending", 
+      name: dataEntry.patientName,      // ডাটাবেজের 'name' ফিল্ড
+      doctorName: dataEntry.doctorId,   // ডাটাবেজের 'doctorName' ফিল্ড
+      age: dataEntry.age || "N/A",
+      phone: dataEntry.phone || "",
+      address: dataEntry.address || "",
+      condition: dataEntry.diagnosis || "Normal",
+      medications: dataEntry.medications ? dataEntry.medications.split(',') : [],
+      nextFollowup: dataEntry.nextFollowup || "",
+      teamNote: dataEntry.notes || "",
+      status: "Stable",
+      createdAt: new Date(), 
     });
     
-    // ২. সাকসেস মেসেজ ট্রিকার করা
-    setEntrySuccess(true); 
-    setTimeout(() => setEntrySuccess(false), 3000); 
-
-    // ৩. ফর্ম রিসেট করা (অপশনাল কিন্তু দরকারি)
-    // setDataEntry({ patientName: "", doctorId: "", chamber: "" }); 
+    // ২. সাকসেস মেসেজ ও ফর্ম ক্লিয়ার
+    setEntrySuccess(true);
+    setTimeout(() => setEntrySuccess(false), 3000);
     
+    setDataEntry({ 
+      patientName: "", age: "", phone: "", address: "", 
+      doctorId: "", chamber: "", diagnosis: "", medications: "", 
+      nextFollowup: "", notes: "" 
+    });
+    
+    alert("Patient entry successful!");
+
   } catch (error) {
-    console.error("Error saving data:", error);
-    alert("ডাটা সেভ করতে সমস্যা হয়েছে!");
+    console.error("Error saving patient:", error);
+    alert("Error saving patient data!");
   } finally {
-    setLoading(false); // লোডিং শেষ
+    setLoading(false);
   }
 };
-  const doctorPatients = patients.filter(p => p.doctorId === "D001");
+ const doctorPatients = patients.filter((p: any) => p.doctorName === "D001");
   const filtered = doctorPatients.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.condition.toLowerCase().includes(searchQuery.toLowerCase())
@@ -868,93 +853,99 @@ const myLiveAppointments = appointments.filter((app) => {
         
 
         <div className="p-8">
-          {/* ── Patients View ── */}
-          {doctorView === "patients" && (
+{/* ── Patients View ── */}
+{doctorView === "patients" && (
+  <>
+    {/* কন্ডিশন ১: যদি কোনো পেশেন্ট সিলেক্ট করা না থাকে, তবেই লিস্ট ও স্ট্যাটাস দেখাবে */}
+    {!selectedPatientId ? (
+      <>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: "Total Patients", value: doctorPatients.length, grad: "from-teal-400 to-emerald-500", icon: <Users className="w-5 h-5" /> },
+            { label: "Stable", value: doctorPatients.filter(p => p.status === "Stable").length, grad: "from-green-400 to-emerald-500", icon: <CheckCircle className="w-5 h-5" /> },
+            { label: "Critical", value: doctorPatients.filter(p => p.status === "Critical").length, grad: "from-red-400 to-rose-500", icon: <AlertCircle className="w-5 h-5" /> },
+            { label: "Follow-up Due", value: doctorPatients.filter(p => p.status === "Follow-up Due").length, grad: "from-amber-400 to-orange-500", icon: <Clock className="w-5 h-5" /> },
+          ].map((s, i) => (
+            <div key={i} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-5 text-white shadow-lg`}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-white/65 text-xs font-bold uppercase tracking-wide">{s.label}</p>
+                <div className="opacity-60">{s.icon}</div>
+              </div>
+              <p className="text-3xl font-black">{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative mb-6">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search by patient name or condition..."
+            className="w-full bg-white border-2 border-teal-100 rounded-xl pl-11 pr-4 py-3.5 text-sm focus:outline-none focus:border-teal-400 transition-colors"
+          />
+        </div>
+
+        {/* Patient List */}
+        <div className="space-y-3">
+          {filtered.map(p => (
+            <div 
+              key={p.id} 
+              className="bg-white rounded-2xl p-6 border border-teal-50 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              onClick={() => setSelectedPatientId(p.id)}
+            >
+              <div className="flex items-start gap-5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-100 to-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <User className="w-6 h-6 text-teal-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-4 flex-wrap mb-1">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-black text-slate-800 text-lg">{p.name}</h3>
+                        <span className="text-slate-300 text-xs font-mono">{p.id}</span>
+                      </div>
+                      <p className="text-slate-500 text-sm font-['DM_Sans',sans-serif]">{p.condition} • Age {p.age} • {p.address}</p>
+                    </div>
+                    <span className={`text-xs font-black px-3 py-1.5 rounded-full flex-shrink-0 ${STATUS_CHIP[p.status] || "bg-slate-100 text-slate-600"}`}>
+                      {p.status}
+                    </span>
+                  </div>
+                  <div className="mt-3 bg-teal-50 rounded-xl p-3.5 border-l-4 border-teal-400">
+                    <p className="text-xs font-black text-teal-600 mb-1 uppercase tracking-wide">Team Update</p>
+                    <p className="text-sm text-teal-800 font-['DM_Sans',sans-serif] leading-relaxed">{p.teamNote}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
+    ) : (
+      /* কন্ডিশন ২: যখন একটি পেশেন্ট সিলেক্ট করা থাকবে, তখন শুধুমাত্র ডিটেইলস কার্ডটি দেখাবে */
+      <div className="bg-white p-8 rounded-3xl border border-teal-50 shadow-lg">
+        {(() => {
+          const p = doctorPatients.find(pat => pat.id === selectedPatientId);
+          return p ? (
             <>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                {[
-                  { label: "Total Patients", value: doctorPatients.length, grad: "from-teal-400 to-emerald-500", icon: <Users className="w-5 h-5" /> },
-                  { label: "Stable", value: doctorPatients.filter(p => p.status === "Stable").length, grad: "from-green-400 to-emerald-500", icon: <CheckCircle className="w-5 h-5" /> },
-                  { label: "Critical", value: doctorPatients.filter(p => p.status === "Critical").length, grad: "from-red-400 to-rose-500", icon: <AlertCircle className="w-5 h-5" /> },
-                  { label: "Follow-up Due", value: doctorPatients.filter(p => p.status === "Follow-up Due").length, grad: "from-amber-400 to-orange-500", icon: <Clock className="w-5 h-5" /> },
-                ].map((s, i) => (
-                  <div key={i} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-5 text-white shadow-lg`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-white/65 text-xs font-bold uppercase tracking-wide">{s.label}</p>
-                      <div className="opacity-60">{s.icon}</div>
-                    </div>
-                    <p className="text-3xl font-black">{s.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="relative mb-6">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search by patient name or condition..."
-                  className="w-full bg-white border-2 border-teal-100 rounded-xl pl-11 pr-4 py-3.5 text-sm focus:outline-none focus:border-teal-400 transition-colors font-['DM_Sans',sans-serif]"
-                />
-              </div>
-
-              <div className="space-y-3">
-                {filtered.map(p => (
-                  <div key={p.id} className="bg-white rounded-2xl p-6 border border-teal-50 hover:shadow-lg hover:shadow-teal-100/60 transition-all duration-200">
-                    <div className="flex items-start gap-5">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-100 to-emerald-100 flex items-center justify-center flex-shrink-0">
-                        <User className="w-6 h-6 text-teal-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-4 flex-wrap mb-1">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-black text-slate-800 text-lg">{p.name}</h3>
-                              <span className="text-slate-300 text-xs font-mono">{p.id}</span>
-                            </div>
-                            <p className="text-slate-500 text-sm font-['DM_Sans',sans-serif]">{p.condition} • Age {p.age} • {p.address}</p>
-                          </div>
-                          <span className={`text-xs font-black px-3 py-1.5 rounded-full flex-shrink-0 ${STATUS_CHIP[p.status] || "bg-slate-100 text-slate-600"}`}>
-                            {p.status}
-                          </span>
-                        </div>
-
-                        <div className="mt-3 bg-teal-50 rounded-xl p-3.5 border-l-4 border-teal-400">
-                          <p className="text-xs font-black text-teal-600 mb-1 uppercase tracking-wide">Team Update</p>
-                          <p className="text-sm text-teal-800 font-['DM_Sans',sans-serif] leading-relaxed">{p.teamNote}</p>
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400 font-['DM_Sans',sans-serif]">
-                          <span className="flex items-center gap-1.5"><Calendar className="w-3 h-3" /> Last followup: <strong className="text-slate-600">{p.lastFollowup}</strong></span>
-                          <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Next followup: <strong className="text-slate-600">{p.nextFollowup}</strong></span>
-                          <span className="flex items-center gap-1.5"><Phone className="w-3 h-3" /> {p.phone}</span>
-                        </div>
-
-                        {p.medications.length > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-1.5">
-                            {p.medications.map((m, i) => (
-                              <span key={i} className="inline-flex items-center gap-1 bg-slate-50 text-slate-600 text-xs font-semibold px-2.5 py-1 rounded-lg border border-slate-100">
-                                <Pill className="w-2.5 h-2.5 text-teal-400" /> {m}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {filtered.length === 0 && (
-                  <div className="text-center py-20 text-slate-300">
-                    <Users className="w-14 h-14 mx-auto mb-3 opacity-40" />
-                    <p className="font-black text-slate-400 text-lg">No patients found</p>
-                    <p className="text-sm font-['DM_Sans',sans-serif]">Try adjusting your search query</p>
-                  </div>
-                )}
-              </div>
+              <button 
+                onClick={() => setSelectedPatientId(null)}
+                className="mb-6 flex items-center gap-2 text-teal-600 font-bold hover:text-teal-700"
+              >
+                ← Back to List
+              </button>
+              <h2 className="text-3xl font-black text-slate-800">{p.name}</h2>
+              {/* এখানে আপনার আগের সেই ডিটেইলস কার্ডের ডিজাইনটি বসান */}
+              <div className="mt-6 text-slate-600">বিস্তারিত তথ্য এখানে...</div>
             </>
-          )}
-
+          ) : null;
+        })()}
+      </div>
+    )}
+  </>
+)}
           {/* ── Team View ── */}
           {doctorView === "team" && (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -990,6 +981,58 @@ const myLiveAppointments = appointments.filter((app) => {
             </div>
           )}
 
+          {/* ── Patient Detail View ── */}
+{selectedPatientId && (() => {
+  const p = doctorPatients.find(pat => pat.id === selectedPatientId);
+  if (!p) return null;
+
+  return (
+    <div className="p-8">
+      <div className="max-w-2xl mx-auto bg-white rounded-3xl overflow-hidden border border-teal-50 shadow-sm">
+        <div className="bg-gradient-to-r from-teal-500 to-emerald-600 p-7 text-white">
+          <div className="flex items-center gap-5">
+            <div className="w-[72px] h-[72px] rounded-2xl bg-white/20 flex items-center justify-center shadow-xl">
+              <User className="w-9 h-9 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black">{p.name}</h2>
+              <p className="text-white/60 font-mono text-sm mt-0.5">{p.id} • Age {p.age}</p>
+              <div className="mt-2">
+                <span className="text-xs font-black px-3 py-1 rounded-full bg-white/20">
+                  {p.status}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-7 space-y-6">
+           {/* এখানে আপনার InfoBlock বা অন্যান্য ডিটেইলস থাকবে */}
+           <div className="grid grid-cols-2 gap-4 text-sm text-slate-600">
+             <div><strong className="text-slate-800">Phone:</strong> {p.phone}</div>
+             <div><strong className="text-slate-800">Condition:</strong> {p.condition}</div>
+           </div>
+           
+           <div className="bg-teal-50 rounded-2xl p-5 border-l-4 border-teal-400">
+             <p className="text-xs font-black text-teal-600 mb-2 uppercase">Team Note</p>
+             <p className="text-sm text-teal-800">{p.teamNote}</p>
+           </div>
+
+           <button
+             onClick={() => { 
+               setSelectedPatientId(null); 
+               // setDoctorView("patients"); // যদি ভিউ পরিবর্তন করে থাকেন
+             }}
+             className="w-full py-3.5 rounded-2xl border-2 border-teal-200 text-teal-600 font-black hover:bg-teal-50 transition-colors"
+           >
+             ← Back to Patients List
+           </button>
+        </div>
+      </div>
+    </div>
+  );
+})()}
+
 {/* ── Firebase Filtered Realtime Appointments View ── */}
         
           {doctorView === "appointments" && (
@@ -1006,12 +1049,13 @@ const myLiveAppointments = appointments.filter((app) => {
               console.log("ফিল্টার করা ডাটা:", filtered);
 
               return filtered.length > 0 ? (
-                <AppointmentSection appointments={filtered} />
-              ) : (
-                <div className="p-8 text-center text-slate-400">
-                  No appointments found for {activeChamber}.
-                </div>
-              );
+  <AppointmentSection 
+    appointments={filtered} 
+    onPatientClick={(patient) => setSelectedPatientId(patient.id)} 
+  />
+) : (
+  <div className="text-center py-20 text-slate-400">No appointments found.</div>
+);
             })()
           )}
         </div> 
@@ -1110,7 +1154,7 @@ const myLiveAppointments = appointments.filter((app) => {
             <p className="text-slate-400 text-sm font-['DM_Sans',sans-serif]">
               {teamView === "call-list" ? `${pendingCalls} calls pending · ${doneCalls} completed today` :
                teamView === "data-entry" ? "Enter patient details from prescription forms" :
-               `Viewing: ${selectedPatient?.name} • ${selectedPatientId}`}
+               `Viewing: ${selectedPatientId?.name} • ${selectedPatientId}`}
             </p>
           </div>
           {teamView === "patient-detail" && (
@@ -1395,71 +1439,71 @@ const myLiveAppointments = appointments.filter((app) => {
 )}
 
           {/* ── Patient Detail ── */}
-          {teamView === "patient-detail" && selectedPatient && (
-            <div className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-3xl overflow-hidden border border-indigo-50 shadow-sm">
-                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-7 text-white">
-                  <div className="flex items-center gap-5">
-                    <div className="w-18 h-18 w-[72px] h-[72px] rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0 shadow-xl">
-                      <User className="w-9 h-9 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-black">{selectedPatient.name}</h2>
-                      <p className="text-white/60 font-mono text-sm mt-0.5">{selectedPatient.id} • Age {selectedPatient.age}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className={`text-xs font-black px-3 py-1 rounded-full bg-white/20 text-white`}>
-                          {selectedPatient.status}
-                        </span>
-                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-white/15 text-white/80 font-['DM_Sans',sans-serif]">
-                          {DOCTORS.find(d => d.id === selectedPatient.doctorId)?.name}
-                        </span>
+          {teamView === "patient-detail" && selectedPatientId && (() => {
+            const p = patients.find(pat => pat.id === selectedPatientId);
+            if (!p) return null;
+
+            return (
+              <div className="max-w-2xl mx-auto">
+                <div className="bg-white rounded-3xl overflow-hidden border border-indigo-50 shadow-sm">
+                  <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-7 text-white">
+                    <div className="flex items-center gap-5">
+                      <div className="w-[72px] h-[72px] rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0 shadow-xl">
+                        <User className="w-9 h-9 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-black">{p.name}</h2>
+                        <p className="text-white/60 font-mono text-sm mt-0.5">{p.id} • Age {p.age}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs font-black px-3 py-1 rounded-full bg-white/20 text-white">
+                            {p.status}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="p-7 space-y-6">
-                  <div className="grid grid-cols-2 gap-3">
-                    <InfoBlock label="Phone" value={selectedPatient.phone} icon={<Phone className="w-3.5 h-3.5" />} />
-                    <InfoBlock label="Address" value={selectedPatient.address} icon={<FileText className="w-3.5 h-3.5" />} />
-                    <InfoBlock label="Condition" value={selectedPatient.condition} icon={<Activity className="w-3.5 h-3.5" />} />
-                    <InfoBlock label="Assigned Doctor" value={DOCTORS.find(d => d.id === selectedPatient.doctorId)?.name || "N/A"} icon={<Stethoscope className="w-3.5 h-3.5" />} />
-                    <InfoBlock label="Last Followup" value={selectedPatient.lastFollowup} icon={<Calendar className="w-3.5 h-3.5" />} />
-                    <InfoBlock label="Next Followup" value={selectedPatient.nextFollowup || "Not scheduled"} icon={<Clock className="w-3.5 h-3.5" />} />
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Current Medications</p>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedPatient.medications.length > 0 ? selectedPatient.medications.map((m, i) => (
-                        <span key={i} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-sm font-bold px-3.5 py-2 rounded-xl border border-indigo-100">
-                          <Pill className="w-3.5 h-3.5" /> {m}
-                        </span>
-                      )) : (
-                        <span className="text-slate-400 text-sm font-['DM_Sans',sans-serif]">No medications recorded</span>
-                      )}
+                  <div className="p-7 space-y-6">
+                    <div className="grid grid-cols-2 gap-3">
+                      <InfoBlock label="Phone" value={p.phone} icon={<Phone className="w-3.5 h-3.5" />} />
+                      <InfoBlock label="Address" value={p.address} icon={<FileText className="w-3.5 h-3.5" />} />
+                      <InfoBlock label="Condition" value={p.condition} icon={<Activity className="w-3.5 h-3.5" />} />
+                      <InfoBlock label="Assigned Doctor" value={DOCTORS.find(d => d.id === p.doctorId)?.name || "N/A"} icon={<Stethoscope className="w-3.5 h-3.5" />} />
+                      <InfoBlock label="Last Followup" value={p.lastFollowup} icon={<Calendar className="w-3.5 h-3.5" />} />
+                      <InfoBlock label="Next Followup" value={p.nextFollowup || "Not scheduled"} icon={<Clock className="w-3.5 h-3.5" />} />
                     </div>
-                  </div>
 
-                  <div className="bg-indigo-50 rounded-2xl p-5 border-l-4 border-indigo-400">
-                    <p className="text-xs font-black text-indigo-600 mb-2 uppercase tracking-wide">Latest Team Note</p>
-                    <p className="text-sm text-indigo-800 font-['DM_Sans',sans-serif] leading-relaxed">{selectedPatient.teamNote}</p>
-                  </div>
+                    <div>
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Current Medications</p>
+                      <div className="flex flex-wrap gap-2">
+                        {p.medications?.length > 0 ? p.medications.map((m, i) => (
+                          <span key={i} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-sm font-bold px-3.5 py-2 rounded-xl border border-indigo-100">
+                            <Pill className="w-3.5 h-3.5" /> {m}
+                          </span>
+                        )) : (
+                          <span className="text-slate-400 text-sm">No medications recorded</span>
+                        )}
+                      </div>
+                    </div>
 
-                  <button
-                    onClick={() => { setTeamView("call-list"); setSelectedPatientId(null); }}
-                    className="w-full py-3.5 rounded-2xl border-2 border-indigo-200 text-indigo-600 font-black hover:bg-indigo-50 transition-colors"
-                  >
-                    ← Back to Call List
-                  </button>
+                    <div className="bg-indigo-50 rounded-2xl p-5 border-l-4 border-indigo-400">
+                      <p className="text-xs font-black text-indigo-600 mb-2 uppercase tracking-wide">Latest Team Note</p>
+                      <p className="text-sm text-indigo-800 leading-relaxed">{p.teamNote}</p>
+                    </div>
+
+                    <button
+                      onClick={() => { setTeamView("call-list"); setSelectedPatientId(null); }}
+                      className="w-full py-3.5 rounded-2xl border-2 border-indigo-200 text-indigo-600 font-black hover:bg-indigo-50 transition-colors"
+                    >
+                      ← Back to Call List
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </main>
     </div>
   );
-
-  return null;
 }

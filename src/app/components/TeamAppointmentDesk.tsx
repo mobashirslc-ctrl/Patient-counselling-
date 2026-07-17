@@ -80,11 +80,11 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
     setUploading(true);
     const data = new FormData();
     data.append("file", file);
-    // Cloudinary আপলোডের জন্য আপনার preset ও cloud_name বসাবেন
-    data.append("upload_preset", "your_cloudinary_preset"); 
+    data.append("upload_preset", "zee_care"); // তোমার ক্লাউডিনারি প্রিসেট
 
     try {
-      const res = await fetch("https://api.cloudinary.com/v1_1/your_cloud_name/image/upload", {
+      // তোমার ক্লাউড নেম 'ddziennkh' এখানে বসানো হয়েছে
+      const res = await fetch("https://api.cloudinary.com/v1_1/ddziennkh/image/upload", {
         method: "POST",
         body: data,
       });
@@ -92,7 +92,7 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
       
       if (fileData.secure_url) {
         setFormData(prev => ({ ...prev, documentUrl: fileData.secure_url }));
-        alert("Medical document successfully uploaded to Cloudinary!");
+        alert("Medical document successfully uploaded!");
       }
     } catch (err) {
       console.error("Cloudinary upload failed:", err);
@@ -101,7 +101,6 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
       setUploading(false);
     }
   };
-
   // 🔄 Firebase-এ পাইপলাইন স্টেপ আপডেট
   const advanceAppointmentStep = async (id: string, currentStep: number) => {
     if (currentStep >= 4) return;
@@ -115,66 +114,41 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
 
   // 🔥 Firebase Firestore-এ ডেটা পাঠানো
   // 🔥 Firebase Firestore-এ ডেটা পাঠানো
-  const handleSubmit = async (e: React.FormEvent) => {
+  // 🔥 Firebase Firestore-এ ডেটা পাঠানো (আপডেটেড)
+const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
+  if (uploading) {
+    alert("Please wait for the file to finish uploading.");
+    return;
+  }
   
-  // ১. ভ্যালিডেশনে doctor যোগ করা হয়েছে
   if (!formData.name || !formData.date || !formData.time || !formData.phone || !formData.chamber || !formData.doctor) {
-    alert("Please fill all required fields, including Doctor and Chamber.");
+    alert("Please fill all required fields!");
     return;
   }
 
   try {
-    console.log("Saving to DB, Chamber value is:", formData.chamber);
     await addDoc(collection(db, "zee_care_appointments"), {
-      name: formData.name,
-      doctor: formData.doctor,      
-      chamber: formData.chamber,    
-      status: "confirmed",          
-      date: new Date(formData.date).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric"
-      }),
-      time: new Date(`2000-01-01T${formData.time}`).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      ...formData,
+      status: formData.condition === "Critical" ? "Critical" : "Stable", // ডক্টর ড্যাশবোর্ডের সাথে সামঞ্জস্যপূর্ণ
+      lastFollowup: new Date().toLocaleDateString("en-GB"), // বর্তমান তারিখটি লাস্ট ভিজিট হিসেবে যাবে
+      nextFollowup: formData.date, // ফর্ম থেকে নেওয়া তারিখটি নেক্সট ফলো-আপ হিসেবে যাবে
       step: 0,
-      age: formData.age,
-      phone: formData.phone,
-      chiefComplaint: formData.chiefComplaint,
-      vitalSigns: formData.vitalSigns,
-      condition: formData.condition,
-      documentUrl: formData.documentUrl,
-      teamNotes: formData.teamNotes,
-      createdAt: new Date().getTime() 
+      createdAt: new Date().getTime()
     });
 
-    // ২. ফর্ম রিসেট
     setFormData({ 
-      name: "", 
-      doctor: "", 
-      chamber: "", 
-      date: "", 
-      time: "", 
-      age: "", 
-      phone: "", 
-      chiefComplaint: "", 
-      vitalSigns: "",
-      condition: "Normal", 
-      documentUrl: "", 
-      teamNotes: ""
+      name: "", doctor: "", chamber: "", date: "", time: "", age: "", phone: "", 
+      chiefComplaint: "", vitalSigns: "", condition: "Normal", documentUrl: "", teamNotes: "" 
     });
     
     setIsOpen(false);
-    alert("Appointment confirmed and synced to Doctor Desk!"); 
+    alert("Appointment synced to Doctor Desk!"); 
   } catch (error) {
     console.error("Error adding to Firebase:", error);
     alert("Database sync failed!");
   }
 };
-
   const getBadgeColor = (cond: string) => {
     if (cond === "Critical") return "bg-rose-100 text-rose-700 border-rose-200";
     if (cond === "Urgent") return "bg-amber-100 text-amber-700 border-amber-200";
