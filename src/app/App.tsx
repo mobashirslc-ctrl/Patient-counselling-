@@ -147,34 +147,31 @@ const [dataEntry, setDataEntry] = useState({
   doctorId: "", chamber: "", diagnosis: "", medications: "", 
   nextFollowup: "", notes: "",
 });
-  // --- ২. useEffect হুক (শুরুতে) ---
-useEffect(() => {
-  const q = collection(db, "zee_care_appointments");
+  useEffect(() => {
+  // ১. শুধুমাত্র নির্দিষ্ট ডাক্তারের অ্যাপয়েন্টমেন্ট আনতে কুয়েরি ফিল্টার যোগ করো
+  const q = query(
+    collection(db, "zee_care_appointments"),
+    where("doctor", "==", currentUser?.name) // এটি তোমার ডক্টরের নাম অনুযায়ী ফিল্টার করবে
+  );
+
   const safetyTimer = setTimeout(() => { 
     if (typeof setLoading === 'function') setLoading(false); 
   }, 5000);
 
   const unsubscribe = onSnapshot(q, (snapshot) => {
-    // ডাটা ম্যাপ করা এবং chamber ফিল্ড নিশ্চিত করা
-    const data = snapshot.docs.map(doc => {
-      const docData = doc.data();
-      return { 
-        id: doc.id, 
-        ...docData,
-        chamber: docData.chamber || "Unknown"
-      };
-    });
-    
-    console.log("সব ডাটা (chamber সহ):", data); 
+    const data = snapshot.docs.map(doc => ({ 
+      id: doc.id, 
+      ...doc.data(),
+      chamber: doc.data().chamber || "Unknown"
+    }));
     
     // সর্টিং লজিক
     const sortedData = [...data].sort((a: any, b: any) => {
-      const dateA = a.createdAt?.seconds ? a.createdAt.seconds : (a.createdAt || 0);
-      const dateB = b.createdAt?.seconds ? b.createdAt.seconds : (b.createdAt || 0);
+      const dateA = a.createdAt?.seconds || 0;
+      const dateB = b.createdAt?.seconds || 0;
       return dateB - dateA; 
     });
 
-    // স্টেট আপডেটgit add .
     if (typeof setAppointments === 'function') setAppointments(sortedData);
     if (typeof setLoading === 'function') setLoading(false);
     
@@ -189,8 +186,28 @@ useEffect(() => {
     clearTimeout(safetyTimer); 
     unsubscribe(); 
   };
-}, []); // dependencies এরর দিলে এখানে [] ই রাখুন
-  // --- ৩. কন্ডিশনাল রিটার্ন (হুকসের পর) ---
+}, [currentUser?.name]); // ডিপেন্ডেন্সি অ্যারেতে currentUser যোগ করো
+// --- পেশেন্টদের জন্য নতুন useEffect ---
+useEffect(() => {
+  if (!currentUser?.name) return; // ইউজার লগড-ইন না থাকলে কিছু করার দরকার নেই
+
+  const q = query(
+    collection(db, "patients"),
+    where("doctorName", "==", currentUser.name)
+  );
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const patientData = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    // তোমার ইনিশিয়াল ডামি ডাটা সরিয়ে রিয়েল ডাটা সেট করা
+    setPatients(patientData); 
+  });
+
+  return () => unsubscribe();
+}, [currentUser?.name]);
+
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center font-bold text-slate-500">
@@ -495,8 +512,7 @@ useEffect(() => {
             {[
               {
                 step: "01", title: "Admin Sets Up",
-                desc: "Admin creates 
-                and team accounts, assigns daily call lists, and controls all platform access.",
+                desc: "Admin creates and team accounts, assigns daily call lists, and controls all platform access.",
                 icon: <Shield className="w-7 h-7" />, grad: "from-yellow-400 to-orange-500",
               },
               {
@@ -979,10 +995,7 @@ const myLiveAppointments = appointments.filter((app) => {
               console.log("ফিল্টার করা ডাটা:", filtered);
 
               return filtered.length > 0 ? (
-                <AppointmentSection 
-  appointments={filtered} 
-  onPatientClick={(apt) => setSelectedPatient(apt)} 
-/>
+                <AppointmentSection appointments={filtered} />
               ) : (
                 <div className="p-8 text-center text-slate-400">
                   No appointments found for {activeChamber}.
