@@ -197,7 +197,16 @@ const [dataEntry, setDataEntry] = useState({
 }, [currentUser?.name]); // ডিপেন্ডেন্সি অ্যারেতে currentUser যোগ করো
 // --- পেশেন্টদের জন্য নতুন useEffect ---
 useEffect(() => {
-  if (!currentUser?.name) return; // ইউজার লগড-ইন না থাকলে কিছু করার দরকার নেই
+  // লগ ১: চেক করা যে useEffect কল হচ্ছে কি না
+  console.log("useEffect triggered. Current User Name:", currentUser?.name);
+
+  if (!currentUser?.name) {
+    console.log("No user name found, setting patients to empty.");
+    setPatients([]); 
+    return; 
+  }
+
+  console.log("Setting up query for doctor:", currentUser.name);
 
   const q = query(
     collection(db, "patients"),
@@ -205,12 +214,18 @@ useEffect(() => {
   );
 
   const unsubscribe = onSnapshot(q, (snapshot) => {
+    // লগ ২: স্ন্যাপশট থেকে ডাটা আসার সময় লগ দিবে
+    console.log("Snapshot received, number of docs:", snapshot.docs.length);
+    
     const patientData = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
-    // তোমার ইনিশিয়াল ডামি ডাটা সরিয়ে রিয়েল ডাটা সেট করা
-    setPatients(patientData); 
+    
+    setPatients(patientData);
+  }, (error) => {
+    // লগ ৩: যদি ডাটা ফেচ করতে কোনো এরর হয়
+    console.error("Error fetching patients:", error);
   });
 
   return () => unsubscribe();
