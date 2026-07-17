@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, onSnapshot, query, orderBy, addDoc } from "firebase/firestore";
+import { 
+  getFirestore, 
+  collection, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  addDoc, 
+  where // এই লাইনটি যোগ করো
+} from "firebase/firestore";
 import { db } from "../firebase"; // আপনার লোকাল কনফিগারেশন ফাইল
 
 // ইমেজ ও কম্পোনেন্ট ইমপোর্ট
