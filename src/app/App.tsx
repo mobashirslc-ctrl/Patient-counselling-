@@ -197,33 +197,34 @@ const [dataEntry, setDataEntry] = useState({
 }, [currentUser?.name]); // ডিপেন্ডেন্সি অ্যারেতে currentUser যোগ করো
 // --- পেশেন্টদের জন্য নতুন useEffect ---
 useEffect(() => {
-  // ১. ইউজার বা নাম না থাকলে সাথে সাথে রিটার্ন করো
-  if (!currentUser || typeof currentUser.name === 'undefined' || currentUser.name === null) {
-    console.log("Waiting for valid user data...");
+  let unsubscribe;
+
+  if (currentUser?.name) {
+    console.log("Valid user, initializing query for:", currentUser.name);
+    
+    const q = query(
+      collection(db, "patients"),
+      where("doctorName", "==", currentUser.name)
+    );
+
+    unsubscribe = onSnapshot(q, (snapshot) => {
+      const patientData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPatients(patientData);
+    }, (err) => {
+      console.error("Firestore error:", err);
+    });
+  } else {
+    console.log("User not ready, clearing patients.");
     setPatients([]);
-    return;
   }
 
-  // ২. এখন নিশ্চিত যে currentUser.name ভ্যালিড
-  console.log("Querying for doctor:", currentUser.name);
-
-  const q = query(
-    collection(db, "patients"),
-    where("doctorName", "==", currentUser.name)
-  );
-
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const patientData = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    setPatients(patientData);
-  }, (err) => {
-    console.error("Firestore error:", err);
-  });
-
-  return () => unsubscribe();
-}, [currentUser]);
+  return () => {
+    if (unsubscribe) unsubscribe();
+  };
+}, [currentUser?.name]);
 
   if (loading) {
     return (
