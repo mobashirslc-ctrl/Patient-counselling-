@@ -197,39 +197,29 @@ const [dataEntry, setDataEntry] = useState({
 }, [currentUser?.name]); // ডিপেন্ডেন্সি অ্যারেতে currentUser যোগ করো
 // --- পেশেন্টদের জন্য নতুন useEffect ---
 useEffect(() => {
-  // লগ ১: চেক করা যে useEffect কল হচ্ছে কি না
-  console.log("useEffect triggered. Current User Name:", currentUser?.name);
+  // নিশ্চিত করো যে currentUser এবং তার name আছে
+  if (currentUser && currentUser.name) {
+    const q = query(
+      collection(db, "patients"),
+      where("doctorName", "==", currentUser.name)
+    );
 
-  if (!currentUser?.name) {
-    console.log("No user name found, setting patients to empty.");
-    setPatients([]); 
-    return; 
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const patientData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPatients(patientData);
+    }, (error) => {
+      console.error("Firestore error:", error);
+    });
+
+    return () => unsubscribe();
+  } else {
+    // যদি নাম না থাকে, তবে পেশেন্ট লিস্ট খালি করে দাও
+    setPatients([]);
   }
-
-  console.log("Setting up query for doctor:", currentUser.name);
-
-  const q = query(
-    collection(db, "patients"),
-    where("doctorName", "==", currentUser.name)
-  );
-
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    // লগ ২: স্ন্যাপশট থেকে ডাটা আসার সময় লগ দিবে
-    console.log("Snapshot received, number of docs:", snapshot.docs.length);
-    
-    const patientData = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
-    setPatients(patientData);
-  }, (error) => {
-    // লগ ৩: যদি ডাটা ফেচ করতে কোনো এরর হয়
-    console.error("Error fetching patients:", error);
-  });
-
-  return () => unsubscribe();
-}, [currentUser?.name]);
+}, [currentUser]); // ডিপেন্ডেন্সি হিসেবে শুধু currentUser রাখো
 
   if (loading) {
     return (
