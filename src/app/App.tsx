@@ -764,7 +764,7 @@ const myLiveAppointments = appointments.filter((app) => {
   <div className="flex flex-col md:flex-row w-full h-screen overflow-hidden bg-[#F0FBF9] font-['Nunito',sans-serif]">
     
     {/* সাইডবার */}
-    <aside className="hidden md:flex w-64 bg-gradient-to-b from-indigo-700 to-purple-800 flex-col flex-shrink-0 h-screen shadow-2xl shadow-indigo-900/30">
+    <aside className="w-full md:w-64 bg-gradient-to-b from-teal-700 to-emerald-800 h-auto md:h-full p-4 overflow-y-auto shadow-2xl">
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-2.5 mb-5">
           <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
@@ -785,26 +785,36 @@ const myLiveAppointments = appointments.filter((app) => {
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
-        {[
-          { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
-          { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
-          { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: myLiveAppointments.length },
-        ].map(item => (
-          <button
-            key={item.id}
-            onClick={() => setDoctorView(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-              doctorView === item.id ? "bg-white text-teal-700 shadow-lg" : "text-white/65 hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            {item.icon}
-            <span className="flex-1 text-left">{item.label}</span>
-            <span className={`text-xs font-black px-2 py-0.5 rounded-full ${doctorView === item.id ? "bg-teal-100 text-teal-600" : "bg-white/10"}`}>
-              {item.badge}
-            </span>
-          </button>
-        ))}
-      </nav>
+  {/* ব্যাক বাটন এখানে যোগ করুন */}
+  <button 
+    onClick={() => window.history.back()} 
+    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:bg-white/10 hover:text-white text-sm font-bold transition-colors mb-4 border border-white/10"
+  >
+    <ArrowLeft className="w-4 h-4" />
+    <span className="flex-1 text-left">Go Back</span>
+  </button>
+
+  {/* বিদ্যমান মেনু আইটেমগুলো */}
+  {[
+    { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
+    { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
+    { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: myLiveAppointments.length },
+  ].map(item => (
+    <button
+      key={item.id}
+      onClick={() => setDoctorView(item.id)}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+        doctorView === item.id ? "bg-white text-teal-700 shadow-lg" : "text-white/65 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      {item.icon}
+      <span className="flex-1 text-left">{item.label}</span>
+      <span className={`text-xs font-black px-2 py-0.5 rounded-full ${doctorView === item.id ? "bg-teal-100 text-teal-600" : "bg-white/10"}`}>
+        {item.badge}
+      </span>
+    </button>
+  ))}
+</nav>
     </aside>
 
     {/* মেইন কন্টেন্ট এলাকা */}
