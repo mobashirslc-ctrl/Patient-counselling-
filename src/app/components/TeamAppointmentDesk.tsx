@@ -3,6 +3,7 @@ import { ChevronRight, CheckCircle, AlertCircle, Plus, X, UserCheck, Paperclip, 
 // db এবং Firestore ফাংশন ইম্পোর্ট
 import { db } from "../../firebase";
 import { collection, addDoc, doc, updateDoc, getDocs, query, where } from "firebase/firestore";
+
 interface AppointmentItem {
   id: string;
   name: string;
@@ -34,30 +35,29 @@ export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDes
   const [selectedDoctorObj, setSelectedDoctorObj] = useState<any>(null);
 
   // ২. ডাক্তারদের লিস্ট ফেচ করার লজিক (অনবোর্ড করা ডাক্তারদের আনতে)
-  useEffect(() => {
-    const fetchDoctors = async () => {
-      try {
-        // ১. 'doctors' কালেকশন পরিবর্তন করে 'users' করা হলো
-        // ২. শুধুমাত্র ডাক্তারদের ফিল্টার করার জন্য 'where' শর্ত যোগ করা হলো
-        const q = query(
-          collection(db, "users"), 
-          where("role", "==", "doctor")
-        ); 
-        
-        const querySnapshot = await getDocs(q);
-        const doctors = querySnapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          ...doc.data() 
-        }));
-        
-        setOnboardedDoctors(doctors);
-      } catch (err) {
-        console.error("Error fetching doctors:", err);
-      }
-    };
-    fetchDoctors();
-  }, []);
+useEffect(() => {
+  const fetchDoctors = async () => {
+    try {
+      const q = collection(db, "users");
+      const querySnapshot = await getDocs(q);
+      
+      const doctorsList = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        // ডাটাবেসের ফিল্ডের নাম 'role' এবং ভ্যালু 'doctor' কি না চেক করুন
+        if (data.role === "doctor") {
+          doctorsList.push({ id: doc.id, name: data.name || "Unnamed Doctor" });
+        }
+      });
 
+      console.log("Doctors list for dropdown:", doctorsList);
+      setOnboardedDoctors(doctorsList);
+    } catch (err) {
+      console.error("Error fetching doctors:", err);
+    }
+  };
+  fetchDoctors();
+}, []);
   const [formData, setFormData] = useState({
   name: "",
   doctor: "", // আগে এখানে নাম ছিল, এখন শুধু খালি স্ট্রিং "" রাখুন

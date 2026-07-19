@@ -149,9 +149,8 @@ const [page, setPage] = useState<Page>("landing");
 const [appointments, setAppointments] = useState<any[]>([]); // একবারই থাকবে
 
 const [activeChamber, setActiveChamber] = useState("All");
-const [currentDoctor, setCurrentDoctor] = useState(
-  DOCTORS.find(d => d.name === "Dr. Shahin Wadud") || DOCTORS[0]
-);
+const [onboardedDoctors, setOnboardedDoctors] = useState([]);
+const [currentDoctor, setCurrentDoctor] = useState(null);
 const [email, setEmail] = useState("");
 const [password, setPassword] = useState("");
 const [loginError, setLoginError] = useState("");
@@ -762,140 +761,91 @@ const myLiveAppointments = appointments.filter((app) => {
 });
 
   return (
-    <div className="min-h-screen bg-[#F0FBF9] font-['Nunito',sans-serif] flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-gradient-to-b from-teal-700 to-emerald-800 flex flex-col flex-shrink-0 min-h-screen shadow-2xl shadow-teal-900/30">
-        <div className="p-6 border-b border-white/10">
-          <div className="flex items-center gap-2.5 mb-5">
-            {/* Doctor Dashboard G-Care PNG Logo */}
-            <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
-              <img 
-                src={logoImg} 
-                alt="ZEE CARE Logo" 
-                className="w-full h-full object-contain" 
-              />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-white font-black text-base leading-none">ZEE CARE</span>
-              <span className="text-[9px] font-bold text-teal-200/70 mt-0.5 tracking-wider">MEDITRACK CLIENT</span>
-            </div>
+  <div className="flex flex-col md:flex-row w-full h-screen overflow-hidden bg-[#F0FBF9] font-['Nunito',sans-serif]">
+    
+    {/* সাইডবার */}
+    <aside className="hidden md:flex w-64 bg-gradient-to-b from-indigo-700 to-purple-800 flex-col flex-shrink-0 h-screen shadow-2xl shadow-indigo-900/30">
+      <div className="p-6 border-b border-white/10">
+        <div className="flex items-center gap-2.5 mb-5">
+          <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
+            <img src={logoImg} alt="ZEE CARE Logo" className="w-full h-full object-contain" />
           </div>
-          <div className="bg-white/10 rounded-2xl p-4">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
-              <User className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-white font-black text-sm">{currentUser?.name}</p>
-            <p className="text-white/50 text-xs font-['DM_Sans',sans-serif] mt-0.5">Cardiology • D001</p>
+          <div className="flex flex-col">
+            <span className="text-white font-black text-base leading-none">ZEE CARE</span>
+            <span className="text-[9px] font-bold text-teal-200/70 mt-0.5 tracking-wider">MEDITRACK CLIENT</span>
           </div>
         </div>
+        <div className="bg-white/10 rounded-2xl p-4">
+          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+            <User className="w-5 h-5 text-white" />
+          </div>
+          <p className="text-white font-black text-sm">{currentUser?.name}</p>
+          <p className="text-white/50 text-xs mt-0.5">Cardiology • D001</p>
+        </div>
+      </div>
 
-        <nav className="flex-1 p-4 space-y-1">
-          {[
-            { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
-            { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
-            // এখানে শুধুমাত্র এই ডক্টরের লাইভ কাউন্ট শো করবে 👇
-            { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: myLiveAppointments.length },
-          ].map(item => (
+      <nav className="flex-1 p-4 space-y-1">
+        {[
+          { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
+          { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
+          { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: myLiveAppointments.length },
+        ].map(item => (
+          <button
+            key={item.id}
+            onClick={() => setDoctorView(item.id)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+              doctorView === item.id ? "bg-white text-teal-700 shadow-lg" : "text-white/65 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            {item.icon}
+            <span className="flex-1 text-left">{item.label}</span>
+            <span className={`text-xs font-black px-2 py-0.5 rounded-full ${doctorView === item.id ? "bg-teal-100 text-teal-600" : "bg-white/10"}`}>
+              {item.badge}
+            </span>
+          </button>
+        ))}
+      </nav>
+    </aside>
+
+    {/* মেইন কন্টেন্ট এলাকা */}
+    <main className="flex-1 flex flex-col h-full overflow-hidden">
+      <header className="bg-white border-b border-teal-100 px-8 py-5 flex items-center justify-between shadow-sm sticky top-0 z-10">
+        <div>
+          <h1 className="text-xl font-black text-teal-900">
+            {doctorView === "patients" && "Patient Overview"}
+            {doctorView === "team" && "My Care Team"}
+            {doctorView === "appointments" && "Live Consultation Queue"}
+          </h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <Bell className="w-5 h-5 text-slate-400" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
+            <User className="w-5 h-5 text-white" />
+          </div>
+        </div>
+      </header>
+
+      {/* চেম্বার ফিল্টার বার */}
+      {doctorView === "appointments" && (
+        <div className="bg-white px-8 py-3 border-b border-teal-50 flex items-center gap-3 overflow-x-auto">
+          <span className="text-xs font-black text-teal-800 uppercase tracking-widest mr-2">Select Chamber:</span>
+          <button
+            onClick={() => setActiveChamber("All")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold ${activeChamber === "All" ? "bg-teal-600 text-white" : "bg-teal-50 text-teal-700"}`}
+          >
+            All
+          </button>
+          {currentDoctor?.chambers?.map((chamber: string) => (
             <button
-              key={item.id}
-              onClick={() => setDoctorView(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-150 ${
-                doctorView === item.id
-                  ? "bg-white text-teal-700 shadow-lg shadow-teal-900/20"
-                  : "text-white/65 hover:bg-white/10 hover:text-white"
-              }`}
+              key={chamber}
+              onClick={() => setActiveChamber(chamber)}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold ${activeChamber === chamber ? "bg-teal-600 text-white" : "bg-teal-50 text-teal-700"}`}
             >
-              {item.icon}
-              <span className="flex-1 text-left">{item.label}</span>
-              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
-                doctorView === item.id ? "bg-teal-100 text-teal-600" : "bg-white/10 text-white/50"
-              }`}>
-                {item.badge}
-              </span>
+              {chamber}
             </button>
           ))}
-        </nav>
-
-        <div className="p-4 pt-0">
-          <div className="bg-white/5 rounded-2xl p-4 mb-3">
-            <div className="flex items-center gap-2 mb-2">
-              <BarChart3 className="w-3.5 h-3.5 text-white/40" />
-              <p className="text-white/40 text-xs font-['DM_Sans',sans-serif]">Today's Activity</p>
-            </div>
-            <p className="text-white font-black text-xl">
-              {typeof INIT_CALLS !== 'undefined' ? INIT_CALLS.length : 0} <span className="text-white/40 text-sm font-normal">calls assigned</span>
-            </p>
-          </div>
-          
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:bg-white/10 hover:text-white text-sm font-bold transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
         </div>
-      </aside>
-
-      {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        <header className="bg-white border-b border-teal-100 px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-teal-50">
-          <div>
-            <h1 className="text-xl font-black text-teal-900">
-              {doctorView === "patients" && "Patient Overview"}
-              {doctorView === "team" && "My Care Team"}
-              {doctorView === "appointments" && "Live Consultation Queue"}
-            </h1>
-            <p className="text-slate-400 text-sm font-['DM_Sans',sans-serif]">
-              {doctorView === "patients" && `${doctorPatients.length} patients under your care`}
-              {doctorView === "team" && `${INIT_TEAM.length} active team members assigned`}
-              {doctorView === "appointments" && `${myLiveAppointments.length} real-time active queue requests`}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="relative cursor-pointer group">
-              <Bell className="w-5 h-5 text-slate-400 group-hover:text-teal-600 transition-colors" />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full text-white text-[10px] font-black flex items-center justify-center">3</span>
-            </div>
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
-              <User className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </header>
-        {/* আপনার দেওয়া নতুন কোডটি ঠিক এইখানে বসবে */}
-  {doctorView === "appointments" && (
-  <div className="bg-white px-8 py-3 border-b border-teal-50 flex items-center gap-3">
-    <span className="text-xs font-black text-teal-800 uppercase tracking-widest mr-2">Select Chamber:</span>
-    
-    {/* "All" বাটন সবসময় থাকবে */}
-    <button
-      onClick={() => setActiveChamber("All")}
-      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-        activeChamber === "All" ? "bg-teal-600 text-white shadow-md" : "bg-teal-50 text-teal-700 hover:bg-teal-100"
-      }`}
-    >
-      All
-    </button>
-
-    {/* ডাক্তারের ডাটা থেকে চেম্বার ম্যাপ করা */}
-    {/* এখানে 'currentDoctor' ভ্যারিয়েবলটি আপনার লগ-ইন করা ডাক্তারের ডাটা হোল্ড করছে ধরে নেওয়া হয়েছে */}
-    {currentDoctor?.chambers?.map((chamber: string) => (
-      <button
-        key={chamber}
-        onClick={() => setActiveChamber(chamber)}
-        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-          activeChamber === chamber 
-            ? "bg-teal-600 text-white shadow-md" 
-            : "bg-teal-50 text-teal-700 hover:bg-teal-100"
-        }`}
-      >
-        {chamber}
-      </button>
-    ))}
-  </div>
-)}
-        
-
+      )}
         <div className="p-8">
 {/* ── Patients View ── */}
 {doctorView === "patients" && (
@@ -1452,17 +1402,24 @@ const myLiveAppointments = appointments.filter((app) => {
         </div>
         <div className="col-span-2">
   <label className="block text-sm font-black text-slate-700 mb-1.5">Assign Doctor</label>
-  <select 
-    value={dataEntry.assignDoctor}
-    onChange={(e) => setDataEntry(prev => ({ ...prev, assignDoctor: e.target.value }))}
-    className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm"
-  >
-    <option value="">Select a Doctor</option>
-    <option value="Dr. Abul Kashem">Dr. Abul Kashem</option>
-    <option value="Dr. Fatema Begum">Dr. Fatema Begum</option>
-    <option value="Dr. Rahim Ahmed">Dr. Rahim Ahmed</option>
-    {/* আপনার লিস্ট অনুযায়ী ডাক্তারদের নাম এখানে যোগ করুন */}
-  </select>
+  <select
+  value={dataEntry.assignDoctor}
+  onChange={(e) => setDataEntry((prev) => ({ ...prev, assignDoctor: e.target.value }))}
+  className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm"
+>
+  <option value="">Select a Doctor</option>
+  
+  {/* ডাটাবেস ফেচ না হওয়া পর্যন্ত এই হার্ডকোডেড নামগুলো দিয়ে চেক করুন */}
+  <option value="Dr. Shahin Wadud">Dr. Shahin Wadud</option>
+  <option value="Dr. Another Name">Dr. Another Name</option>
+
+  {/* ডায়নামিক ডাটা যদি পরে ঠিক হয়, তবে এটিও কাজ করবে */}
+  {onboardedDoctors?.map((doc) => (
+    <option key={doc.id} value={doc.name}>
+      {doc.name}
+    </option>
+  ))}
+</select>
 </div>
         {/* Address */}
         <div className="col-span-2">
@@ -1517,7 +1474,7 @@ console.log("Check fields:", {
   hasDoctor: !!dataEntry.assignDoctor,
   hasPhone: !!dataEntry.phone
 });
-            return (
+            retun (
               <div className="max-w-2xl mx-auto">
                 <div className="bg-white rounded-3xl overflow-hidden border border-indigo-50 shadow-sm">
                   <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-7 text-white">
