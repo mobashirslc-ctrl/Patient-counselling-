@@ -764,7 +764,7 @@ const myLiveAppointments = appointments.filter((app) => {
   <div className="flex flex-col md:flex-row w-full h-screen overflow-hidden bg-[#F0FBF9] font-['Nunito',sans-serif]">
     
     {/* সাইডবার */}
-    <aside className="w-full md:w-64 bg-gradient-to-b from-teal-700 to-emerald-800 h-auto md:h-screen flex-shrink-0 p-4 shadow-2xl">
+    <aside className="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-teal-700 to-emerald-800 shadow-2xl z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-2.5 mb-5">
           <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
