@@ -785,36 +785,26 @@ const myLiveAppointments = appointments.filter((app) => {
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
-  {/* ব্যাক বাটন এখানে যোগ করুন */}
-  <button 
-    onClick={() => window.history.back()} 
-    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:bg-white/10 hover:text-white text-sm font-bold transition-colors mb-4 border border-white/10"
-  >
-    <ArrowLeft className="w-4 h-4" />
-    <span className="flex-1 text-left">Go Back</span>
-  </button>
-
-  {/* বিদ্যমান মেনু আইটেমগুলো */}
-  {[
-    { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
-    { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
-    { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: myLiveAppointments.length },
-  ].map(item => (
-    <button
-      key={item.id}
-      onClick={() => setDoctorView(item.id)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-        doctorView === item.id ? "bg-white text-teal-700 shadow-lg" : "text-white/65 hover:bg-white/10 hover:text-white"
-      }`}
-    >
-      {item.icon}
-      <span className="flex-1 text-left">{item.label}</span>
-      <span className={`text-xs font-black px-2 py-0.5 rounded-full ${doctorView === item.id ? "bg-teal-100 text-teal-600" : "bg-white/10"}`}>
-        {item.badge}
-      </span>
-    </button>
-  ))}
-</nav>
+        {[
+          { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
+          { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
+          { id: "appointments" as DoctorView, label: "Appointments", icon: <Calendar className="w-4 h-4" />, badge: myLiveAppointments.length },
+        ].map(item => (
+          <button
+            key={item.id}
+            onClick={() => setDoctorView(item.id)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+              doctorView === item.id ? "bg-white text-teal-700 shadow-lg" : "text-white/65 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            {item.icon}
+            <span className="flex-1 text-left">{item.label}</span>
+            <span className={`text-xs font-black px-2 py-0.5 rounded-full ${doctorView === item.id ? "bg-teal-100 text-teal-600" : "bg-white/10"}`}>
+              {item.badge}
+            </span>
+          </button>
+        ))}
+      </nav>
     </aside>
 
     {/* মেইন কন্টেন্ট এলাকা */}
