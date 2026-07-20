@@ -3,11 +3,13 @@ import { initializeApp } from "firebase/app";
 import { 
   getFirestore, 
   collection, 
-  onSnapshot, 
-  query, 
-  orderBy, 
   addDoc, 
-  where // এই লাইনটি যোগ করো
+  onSnapshot, 
+  doc, 
+  setDoc, 
+  getDocs, 
+  query, 
+  where 
 } from "firebase/firestore";
 import { UploadCloud } from 'lucide-react';
 import { db } from "../firebase"; // আপনার লোকাল কনফিগারেশন ফাইল
@@ -16,12 +18,13 @@ import { db } from "../firebase"; // আপনার লোকাল কনফ�
 import logoImg from './components/figma/G-care final 2-01.png';
 import AppointmentSection from "./components/AppointmentSection";
 import TeamAppointmentDesk from "./components/TeamAppointmentDesk";
-import {
-  Heart, Users, Phone, FileText, CheckCircle, LogOut,
+import { 
+  Heart, Users, Phone, FileText, CheckCircle, 
   Bell, Calendar, Clipboard, Activity, Search, Plus,
   Eye, Clock, AlertCircle, Stethoscope, Shield,
-  ArrowRight, Check, User, PhoneCall, ClipboardList,
+  ArrowRight, ArrowLeft, Check, User, PhoneCall, ClipboardList,
   UserCheck, ChevronRight, Pill, BarChart3,
+  LogOut // <-- এখানে LogOut যোগ করে দিন
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────
@@ -44,7 +47,7 @@ interface PatientRecord {
 
 type Page = "landing" | "login" | "doctor" | "team";
 type DoctorView = "patients" | "team" | "appointments" | "patient-detail";
-type TeamView = "call-list" | "data-entry" | "patient-detail" | "appointments";
+type TeamView = "call-list" | "data-entry" | "appointments" | "patient-history" | "patient-detail";
 // ─── Mock Data ────────────────────────────────────────────────
 
 const CREDS: Record<string, { password: string; role: "doctor" | "team"; name: string }> = {
@@ -185,39 +188,43 @@ const [dataEntry, setDataEntry] = useState({
 });
 
 useEffect(() => {
-  if (!currentUser?.name) {
-    setLoading(false);
-    setAppointments([]);
-    setPatients([]);
-    return;
-  }
+    if (!currentUser?.name) {
+      setLoading(false);
+      setAppointments([]);
+      setPatients([]);
+      return;
+    }
 
-  // ১. কুয়েরি ডিফাইন করা
-  const qAppointments = query(
-    collection(db, "zee_care_appointments"), 
-    where("doctor", "==", "Dr. " + currentUser.name)
-  );
+    // ১. কুয়েরি ডিফাইন করা (সেফটি চেক সহ)
+    const qAppointments = query(
+      collection(db, "zee_care_appointments"), 
+      where("doctor", "==", "Dr. " + currentUser.name)
+    );
 
-  const qPatients = query(collection(db, "patients")); 
+    const qPatients = query(collection(db, "patients")); 
 
-  // ২. সাবস্ক্রিপশন সেট করা (এখানে unsubAppts ডিফাইন করা হয়েছে)
-  const unsubAppts = onSnapshot(qAppointments, (snap) => {
-    setAppointments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  });
+    // ২. সাবস্ক্রিপশন সেট করা
+    const unsubAppts = onSnapshot(qAppointments, (snap) => {
+      setAppointments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
 
-  const unsubPatients = onSnapshot(qPatients, (snap) => {
-    const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    console.log("Found patients:", data);
-    setPatients(data);
-    setLoading(false);
-  });
+    const unsubPatients = onSnapshot(qPatients, (snap) => {
+      const data = snap.docs.map(doc => ({ 
+        id: doc.id, // 👈 ফায়ারস্টোর ডকুমেন্ট আইডি ম্যাপিং
+        ...doc.data() 
+      }));
+      console.log("Found patients with ID:", data);
+      setPatients(data);
+      setLoading(false);
+    });
 
-  // ৩. ক্লিনআপ ফাংশন (এখন unsubAppts এখানে পাওয়া যাবে)
-  return () => {
-    unsubAppts();
-    unsubPatients();
-  };
-}, [currentUser?.name]);
+    // ৩. ক্লিনআপ ফাংশন
+    return () => {
+      unsubAppts();
+      unsubPatients();
+    };
+  }, [currentUser?.name]);
+
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center font-bold text-slate-500">
@@ -761,11 +768,13 @@ const myLiveAppointments = appointments.filter((app) => {
 });
 
   return (
-  <div className="flex flex-col md:flex-row w-full h-screen overflow-hidden bg-[#F0FBF9] font-['Nunito',sans-serif]">
+  <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-['DM_Sans',sans-serif]">
     
     {/* সাইডবার */}
-    <aside className="fixed inset-y-0 left-0 w-64 bg-gradient-to-b from-teal-700 to-emerald-800 shadow-2xl z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
-      <div className="p-6 border-b border-white/10">
+    <aside className="w-64 bg-gradient-to-b from-indigo-700 to-purple-800 flex flex-col flex-shrink-0 h-screen shadow-2xl z-20">
+      
+      {/* ওপরের লোগো এবং ইউজার প্রোফাইল অংশ */}
+      <div className="p-6 border-b border-white/10 flex-shrink-0">
         <div className="flex items-center gap-2.5 mb-5">
           <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
             <img src={logoImg} alt="ZEE CARE Logo" className="w-full h-full object-contain" />
@@ -784,7 +793,8 @@ const myLiveAppointments = appointments.filter((app) => {
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
+      {/* মাঝখানের নেভিগেশন মেনু */}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {[
           { id: "patients" as DoctorView, label: "My Patients", icon: <Users className="w-4 h-4" />, badge: doctorPatients.length },
           { id: "team" as DoctorView, label: "My Team", icon: <UserCheck className="w-4 h-4" />, badge: INIT_TEAM.length },
@@ -805,11 +815,40 @@ const myLiveAppointments = appointments.filter((app) => {
           </button>
         ))}
       </nav>
+
+<div className="p-4 border-t border-white/10 flex flex-col gap-2 flex-shrink-0 bg-black/10">
+        
+        {/* Back Button */}
+        <button
+          onClick={() => {
+            setCurrentUser(null);
+            setPage("landing");
+          }}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-white/70 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Portal</span>
+        </button>
+
+        {/* Logout Button */}
+        <button
+          onClick={() => {
+            setCurrentUser(null);
+            setPage("landing");
+          }}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-red-300 hover:bg-red-500/20 hover:text-red-200 transition-all cursor-pointer"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Logout</span>
+        </button>
+
+      </div>
+
     </aside>
 
     {/* মেইন কন্টেন্ট এলাকা */}
-    <main className="flex-1 flex flex-col h-full overflow-hidden">
-      <header className="bg-white border-b border-teal-100 px-8 py-5 flex items-center justify-between shadow-sm sticky top-0 z-10">
+    <main className="flex-1 flex flex-col min-w-0 w-full h-full overflow-hidden bg-slate-50">
+      <header className="bg-white border-b border-teal-100 px-8 py-5 flex items-center justify-between sticky top-0 z-10 flex-shrink-0 shadow-sm w-full">
         <div>
           <h1 className="text-xl font-black text-teal-900">
             {doctorView === "patients" && "Patient Overview"}
@@ -846,13 +885,13 @@ const myLiveAppointments = appointments.filter((app) => {
           ))}
         </div>
       )}
-        <div className="p-8">
+        <div className="flex-1 min-h-0 overflow-y-auto p-8 w-full">
 {/* ── Patients View ── */}
 {doctorView === "patients" && (
-  <div className="flex flex-col gap-6">
+  <div className="flex flex-col flex-1 min-h-0 w-full overflow-y-auto p-8 gap-6">
     {!selectedPatientId ? (
-      /* লিস্ট ভিউ (ডাটা দেখানোর জন্য) */
-      <div className="space-y-3">
+      /* লিস্ট ভিউ (এখানে আর আলাদা করে overflow দেওয়ার দরকার নেই, কারণ প্যারেন্ট ডিভে দেওয়া হয়েছে) */
+      <div className="w-full space-y-4">
         {patients && patients.length > 0 ? (
           patients.map((p) => (
             <div 
@@ -898,10 +937,9 @@ const myLiveAppointments = appointments.filter((app) => {
         )}
       </div>
     ) : (
-      /* ডিটেইলস ভিউ (সঠিক এ্যারে `patients` দিয়ে খোঁজা হয়েছে) */
+      /* ডিটেইলস ভিউ */
       <div className="bg-white p-8 rounded-3xl border border-teal-50 shadow-lg">
         {(() => {
-          // এখানে doctorPatients এর বদলে patients ব্যবহার করা হয়েছে এবং সেফ ম্যাচিং এর জন্য String() করা হয়েছে
           const p = patients.find(pat => String(pat.id) === String(selectedPatientId));
           
           return p ? (
@@ -1052,6 +1090,20 @@ const myLiveAppointments = appointments.filter((app) => {
     </div>
   );
 })()}
+{/* Patient Medical Report Attachment */}
+{selectedPatient?.documentUrl && (
+  <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 mt-4">
+    <p className="text-xs font-black text-indigo-900 uppercase tracking-wider mb-2">Attached Medical Report / Document</p>
+    <a 
+      href={selectedPatient.documentUrl} 
+      target="_blank" 
+      rel="noreferrer"
+      className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800 font-black text-xs bg-white border border-indigo-200 px-3 py-2 rounded-xl shadow-sm transition-all"
+    >
+      <FileText size={14} /> View / Download Patient Report Document
+    </a>
+  </div>
+)}
 {/* ── Firebase Filtered Realtime Appointments View ── */}
         
           {doctorView === "appointments" && (
@@ -1087,9 +1139,10 @@ const myLiveAppointments = appointments.filter((app) => {
   // ═══════════════════════════════════════════════════════════
 
   if (page === "team") return (
-    <div className="min-h-screen bg-[#F0FBF9] font-['Nunito',sans-serif] flex">
+<div className="flex h-screen w-screen bg-slate-50">
       {/* Sidebar */}
-      <aside className="w-64 bg-gradient-to-b from-indigo-700 to-purple-800 flex flex-col flex-shrink-0 min-h-screen shadow-2xl shadow-indigo-900/30">
+    <aside className="w-64 bg-indigo-900 h-full flex flex-col flex-shrink-0">
+    {/* ... সাইডবার মেনু ... */}
         <div className="p-6 border-b border-white/10">
           <div className="flex items-center gap-2.5 mb-5">
   {/* Team Dashboard G-Care PNG Logo */}
@@ -1118,7 +1171,9 @@ const myLiveAppointments = appointments.filter((app) => {
           {[
             { id: "call-list" as TeamView, label: "Daily Call List", icon: <PhoneCall className="w-4 h-4" />, badge: pendingCalls, urgent: pendingCalls > 0 },
             { id: "data-entry" as TeamView, label: "Patient Data Entry", icon: <ClipboardList className="w-4 h-4" />, badge: null, urgent: false },
-      { id: "appointments" as TeamView, label: "Appointment Desk", icon: <Calendar className="w-4 h-4" />, badge: appointments.filter(a => a.step < 4).length },
+            { id: "appointments" as TeamView, label: "Appointment Desk", icon: <Calendar className="w-4 h-4" />, badge: appointments.filter(a => a.step < 4).length },
+            // ─── নতুন Patient History মেনু এখানে যোগ হলো ───
+            { id: "patient-history" as TeamView, label: "Patient Directory", icon: <FileText className="w-4 h-4" />, badge: null, urgent: false },
           ].map(item => (
             <button
               key={item.id}
@@ -1139,7 +1194,7 @@ const myLiveAppointments = appointments.filter((app) => {
             </button>
           ))}
         </nav>
-
+        
         <div className="p-4 pt-0">
           <div className="bg-white/10 rounded-2xl p-4 mb-3">
             <p className="text-white/40 text-xs font-['DM_Sans',sans-serif] mb-2">Today's Progress</p>
@@ -1161,30 +1216,42 @@ const myLiveAppointments = appointments.filter((app) => {
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 overflow-auto">
-        <header className="bg-white border-b border-indigo-100 px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-indigo-50">
-          <div>
-            <h1 className="text-xl font-black text-indigo-900">
-              {teamView === "call-list" ? "Daily Call List" :
-               teamView === "data-entry" ? "Patient Data Entry" :
-               "Patient Details"}
-            </h1>
-            <p className="text-slate-400 text-sm font-['DM_Sans',sans-serif]">
-              {teamView === "call-list" ? `${pendingCalls} calls pending · ${doneCalls} completed today` :
-               teamView === "data-entry" ? "Enter patient details from prescription forms" :
-               `Viewing: ${selectedPatientId?.name} • ${selectedPatientId}`}
-            </p>
-          </div>
-          {teamView === "patient-detail" && (
-            <button
-              onClick={() => { setTeamView("call-list"); setSelectedPatientId(null); }}
-              className="flex items-center gap-2 text-sm font-bold text-indigo-500 hover:text-indigo-800 transition-colors"
-            >
-              ← Back to Call List
-            </button>
-          )}
-        </header>
+<main className="flex-1 flex flex-col h-full overflow-y-auto">
+    <header className="sticky top-0 z-20 bg-white border-b px-8 py-5">
+    <div>
+      <h1 className="text-xl font-black text-indigo-900">
+        {teamView === "call-list" ? "Daily Call List" :
+         teamView === "data-entry" ? "Patient Data Entry" :
+         teamView === "appointments" ? "Appointment Desk & Pipeline" :
+         teamView === "patient-history" ? "Patient History & Directory" :
+         "Patient Details"}
+      </h1>
+      <p className="text-slate-400 text-sm font-['DM_Sans',sans-serif]">
+        {teamView === "call-list" ? "Manage daily patient calls and follow-ups" :
+         teamView === "data-entry" ? "Enter patient details from prescription forms" :
+         teamView === "appointments" ? "Manage hospital serials, doctor slots & verification pipeline" :
+         teamView === "patient-history" ? "Search patient records by phone number and update details" :
+         "View and manage patient profile details"}
+      </p>
+    </div>
+    {teamView === "patient-detail" && (
+      <button
+        onClick={() => { setTeamView("call-list"); setSelectedPatientId(null); }}
+        className="flex items-center gap-2 text-sm font-bold text-indigo-500 hover:text-indigo-800 transition-colors"
+      >
+        ← Back to Call List
+      </button>
+    )}
+  </header>
+  
+  <div className="p-8 flex-1 overflow-auto">
+    {teamView === "call-list" && <p className="text-slate-600">Call list content...</p>}
+    {teamView === "data-entry" && <p className="text-slate-600">Data entry content...</p>}
+    {teamView === "appointments" && <TeamAppointmentDesk appointments={appointments} setAppointments={setAppointments} />}
+    {teamView === "patient-history" && <PatientHistorySection />}
+  </div>
+
+  
 
         <div className="p-8">
 
@@ -1444,19 +1511,18 @@ const myLiveAppointments = appointments.filter((app) => {
         </div>
 
         {/* Submit Button */}
-<button
-  onClick={submitDataEntry}
-  disabled={false} // এটাকে সাময়িকভাবে false করে দিলাম
-  className={`col-span-2 w-full mt-6 py-4 rounded-2xl font-black text-lg transition-all duration-200 flex items-center justify-center gap-3 ${
-    "bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-xl"
-  }`}
->
-  {loading ? "Saving..." : "Add Patient to Doctor's List"}
-</button>
+{/* Submit Button */}
+        <button
+          onClick={submitDataEntry}
+          disabled={false}
+          className="col-span-2 w-full mt-6 py-4 rounded-2xl font-black text-lg transition-all duration-200 flex items-center justify-center gap-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-xl"
+        >
+          {loading ? "Saving..." : "Add Patient to Doctor's List"}
+        </button>
 
-      </div> {/* Closing grid container */}
-    </div> {/* Closing inner wrapper */}
-  </div> // Closing main padding container
+      </div> 
+    </div> 
+  </div> 
 )}
 
 {/* Appointment Desk View */}
@@ -1535,6 +1601,192 @@ console.log("Check fields:", {
           })()}
         </div>
       </main>
+    </div>
+  );
+}
+function PatientHistorySection() {
+  const [patientsList, setPatientsList] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [editingPatient, setEditingPatient] = useState<any>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
+  useEffect(() => {
+    const q = query(collection(db, "patients"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      }));
+      setPatientsList(list);
+    }, (error) => {
+      console.error("Firestore error:", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const filteredPatients = patientsList.filter(p => {
+    const nameMatch = p?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+    const phoneMatch = p?.phone?.toString().includes(searchTerm) || false;
+    return nameMatch || phoneMatch;
+  });
+
+  const handleUpdatePatient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPatient || !editingPatient.id) return;
+    
+    try {
+      setUpdating(true);
+      const docRef = doc(db, "patients", editingPatient.id);
+      await updateDoc(docRef, {
+        name: editingPatient.name || "",
+        phone: editingPatient.phone || "",
+        age: editingPatient.age || "",
+        teamNote: editingPatient.teamNote || "",
+      });
+      alert("Updated successfully!");
+      setIsEditModalOpen(false);
+    } catch (error) {
+      alert("Failed to update.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  return (
+    <div className="w-full space-y-6">
+      {/* Search Input */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <Search className="w-5 h-5 text-slate-400 ml-2" />
+        <input
+          type="text"
+          placeholder="Search by Patient Name or Phone Number..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-600 font-medium text-slate-800"
+        />
+      </div>
+
+      {/* Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filteredPatients.length > 0 ? (
+          filteredPatients.map(patient => (
+            <div key={patient.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-black text-slate-800 text-base">{patient.name || "Unnamed"}</h3>
+                  <p className="text-xs text-slate-500 font-bold mt-0.5">Phone: {patient.phone || "N/A"}</p>
+                </div>
+                <span className="text-xs px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-black">
+                  Age: {patient.age || "N/A"}
+                </span>
+              </div>
+              
+              <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl space-y-1">
+                <p><strong className="text-slate-700">Complaint:</strong> {patient.chiefComplaint || "N/A"}</p>
+                <p><strong className="text-slate-700">Note:</strong> {patient.teamNote || "No notes"}</p>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => { 
+                    setEditingPatient({ ...patient }); 
+                    setIsEditModalOpen(true); 
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors shadow-sm"
+                >
+                  Edit Info
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="col-span-2 text-center py-12 bg-white rounded-2xl border border-slate-200 shadow-sm">
+            <p className="text-slate-400 text-sm font-medium">No patient records found.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Edit Modal */}
+      {isEditModalOpen && editingPatient && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h2 className="text-lg font-black text-slate-800">Edit Patient Record</h2>
+              <button 
+                type="button" 
+                onClick={() => setIsEditModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdatePatient} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Patient Name</label>
+                <input
+                  type="text"
+                  value={editingPatient.name || ""}
+                  onChange={(e) => setEditingPatient({...editingPatient, name: e.target.value})}
+                  className="w-full border border-slate-200 bg-slate-50 p-2.5 rounded-xl text-sm font-medium"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Phone Number</label>
+                <input
+                  type="text"
+                  value={editingPatient.phone || ""}
+                  onChange={(e) => setEditingPatient({...editingPatient, phone: e.target.value})}
+                  className="w-full border border-slate-200 bg-slate-50 p-2.5 rounded-xl text-sm font-medium"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Age</label>
+                <input
+                  type="text"
+                  value={editingPatient.age || ""}
+                  onChange={(e) => setEditingPatient({...editingPatient, age: e.target.value})}
+                  className="w-full border border-slate-200 bg-slate-50 p-2.5 rounded-xl text-sm font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Team Note</label>
+                <textarea
+                  rows={3}
+                  value={editingPatient.teamNote || ""}
+                  onChange={(e) => setEditingPatient({...editingPatient, teamNote: e.target.value})}
+                  className="w-full border border-slate-200 bg-slate-50 p-2.5 rounded-xl text-sm font-medium"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setIsEditModalOpen(false)} 
+                  className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={updating} 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md"
+                >
+                  {updating ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,78 +1,52 @@
 import React, { useState, useEffect } from "react";
-import { ChevronRight, CheckCircle, AlertCircle, Plus, X, UserCheck, Paperclip, FileText } from "lucide-react";
-// db এবং Firestore ফাংশন ইম্পোর্ট
+import { 
+  Plus, X, FileText, CheckCircle, AlertCircle, 
+  ChevronRight, UserCheck, Paperclip 
+} from "lucide-react";
 import { db } from "../../firebase";
-import { collection, addDoc, doc, updateDoc, getDocs, query, where } from "firebase/firestore";
-
-interface AppointmentItem {
-  id: string;
-  name: string;
-  doctor: string;
-  date: string;
-  time: string;
-  step: number;
-  age: string;
-  phone: string;
-  chiefComplaint: string;
-  vitalSigns?: string;
-  condition: "Normal" | "Urgent" | "Critical";
-  documentUrl?: string;
-  teamNotes?: string;
-}
+import { collection, addDoc, updateDoc, doc, getDocs, setDoc } from "firebase/firestore";
 
 interface TeamAppointmentDeskProps {
-  appointments: AppointmentItem[];
+  appointments: any[];
 }
 
-const PIPELINE_STEPS = ["Patient Request", "Verify Data", "Hospital Schedule", "Doctor Slot", "Notify Patient"];
+const PIPELINE_STEPS = ["Verified", "Doctor Assigned", "Chamber Booked", "Ready for Consult"];
 
 export default function TeamAppointmentDesk({ appointments }: TeamAppointmentDeskProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
-  
-  // ১. ডাক্তারদের লিস্টের স্টেট
+  const [editingPatient, setEditingPatient] = useState<any>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [onboardedDoctors, setOnboardedDoctors] = useState<any[]>([]);
-  const [selectedDoctorObj, setSelectedDoctorObj] = useState<any>(null);
 
-  // ২. ডাক্তারদের লিস্ট ফেচ করার লজিক (অনবোর্ড করা ডাক্তারদের আনতে)
-useEffect(() => {
-  const fetchDoctors = async () => {
-    try {
-      const q = collection(db, "users");
-      const querySnapshot = await getDocs(q);
-      
-      const doctorsList = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        // ডাটাবেসের ফিল্ডের নাম 'role' এবং ভ্যালু 'doctor' কি না চেক করুন
-        if (data.role === "doctor") {
-          doctorsList.push({ id: doc.id, name: data.name || "Unnamed Doctor" });
-        }
-      });
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "doctors"));
+        const docsList = querySnapshot.docs.map(docItem => ({ id: docItem.id, ...docItem.data() }));
+        setOnboardedDoctors(docsList);
+      } catch (error) {
+        console.error("Error fetching doctors:", error);
+      }
+    };
+    fetchDoctors();
+  }, []);
 
-      console.log("Doctors list for dropdown:", doctorsList);
-      setOnboardedDoctors(doctorsList);
-    } catch (err) {
-      console.error("Error fetching doctors:", err);
-    }
-  };
-  fetchDoctors();
-}, []);
   const [formData, setFormData] = useState({
-  name: "",
-  doctor: "", // আগে এখানে নাম ছিল, এখন শুধু খালি স্ট্রিং "" রাখুন
-  date: "",
-  time: "",
-  age: "",
-  phone: "",
-  chiefComplaint: "",
-  vitalSigns: "",
-  condition: "Normal" as "Normal" | "Urgent" | "Critical",
-  documentUrl: "",
-  teamNotes: "",
-  chamber: "",
-});
-  // ☁️ Cloudinary File Upload Handler (সম্পূর্ণ লজিক)
+    name: "",
+    doctor: "",
+    date: "",
+    time: "",
+    age: "",
+    phone: "",
+    chiefComplaint: "",
+    vitalSigns: "",
+    condition: "Normal" as "Normal" | "Urgent" | "Critical",
+    documentUrl: "",
+    teamNotes: "",
+    chamber: "",
+  });
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -80,10 +54,9 @@ useEffect(() => {
     setUploading(true);
     const data = new FormData();
     data.append("file", file);
-    data.append("upload_preset", "zee_care"); // তোমার ক্লাউডিনারি প্রিসেট
+    data.append("upload_preset", "zee_care");
 
     try {
-      // তোমার ক্লাউড নেম 'ddziennkh' এখানে বসানো হয়েছে
       const res = await fetch("https://api.cloudinary.com/v1_1/ddziennkh/image/upload", {
         method: "POST",
         body: data,
@@ -101,7 +74,7 @@ useEffect(() => {
       setUploading(false);
     }
   };
-  // 🔄 Firebase-এ পাইপলাইন স্টেপ আপডেট
+
   const advanceAppointmentStep = async (id: string, currentStep: number) => {
     if (currentStep >= 4) return;
     try {
@@ -112,43 +85,69 @@ useEffect(() => {
     }
   };
 
-  // 🔥 Firebase Firestore-এ ডেটা পাঠানো
-  // 🔥 Firebase Firestore-এ ডেটা পাঠানো
-  // 🔥 Firebase Firestore-এ ডেটা পাঠানো (আপডেটেড)
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (uploading) {
-    alert("Please wait for the file to finish uploading.");
-    return;
-  }
-  
-  if (!formData.name || !formData.date || !formData.time || !formData.phone || !formData.chamber || !formData.doctor) {
-    alert("Please fill all required fields!");
-    return;
-  }
-
-  try {
-    await addDoc(collection(db, "zee_care_appointments"), {
-      ...formData,
-      status: formData.condition === "Critical" ? "Critical" : "Stable", // ডক্টর ড্যাশবোর্ডের সাথে সামঞ্জস্যপূর্ণ
-      lastFollowup: new Date().toLocaleDateString("en-GB"), // বর্তমান তারিখটি লাস্ট ভিজিট হিসেবে যাবে
-      nextFollowup: formData.date, // ফর্ম থেকে নেওয়া তারিখটি নেক্সট ফলো-আপ হিসেবে যাবে
-      step: 0,
-      createdAt: new Date().getTime()
-    });
-
-    setFormData({ 
-      name: "", doctor: "", chamber: "", date: "", time: "", age: "", phone: "", 
-      chiefComplaint: "", vitalSigns: "", condition: "Normal", documentUrl: "", teamNotes: "" 
-    });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (uploading) {
+      alert("Please wait for the file to finish uploading.");
+      return;
+    }
     
-    setIsOpen(false);
-    alert("Appointment synced to Doctor Desk!"); 
-  } catch (error) {
-    console.error("Error adding to Firebase:", error);
-    alert("Database sync failed!");
-  }
-};
+    if (!formData.name || !formData.date || !formData.time || !formData.phone || !formData.chamber || !formData.doctor) {
+      alert("Please fill all required fields!");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "zee_care_appointments"), {
+        ...formData,
+        status: formData.condition === "Critical" ? "Critical" : "Stable",
+        lastFollowup: new Date().toLocaleDateString("en-GB"),
+        nextFollowup: formData.date,
+        step: 0,
+        createdAt: new Date().getTime()
+      });
+
+      setFormData({ 
+        name: "", doctor: "", chamber: "", date: "", time: "", age: "", phone: "", 
+        chiefComplaint: "", vitalSigns: "", condition: "Normal", documentUrl: "", teamNotes: "" 
+      });
+      
+      setIsOpen(false);
+      alert("Appointment synced to Doctor Desk!"); 
+    } catch (error) {
+      console.error("Error adding to Firebase:", error);
+      alert("Database sync failed!");
+    }
+  };
+
+  const handleUpdatePatient = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingPatient || !editingPatient.id) {
+      alert("Error: Patient ID is missing!");
+      return;
+    }
+
+    try {
+      const docRef = doc(db, "zee_care_appointments", String(editingPatient.id));
+
+      await setDoc(docRef, {
+        name: editingPatient.name,
+        age: editingPatient.age,
+        phone: editingPatient.phone,
+        chiefComplaint: editingPatient.chiefComplaint,
+        teamNotes: editingPatient.teamNotes || "",
+      }, { merge: true });
+
+      setIsEditModalOpen(false);
+      setEditingPatient(null);
+      alert("Patient record updated successfully!");
+    } catch (error: any) {
+      console.error("Detailed Update Error:", error);
+      alert("Failed to update: " + (error.message || JSON.stringify(error)));
+    }
+  };
+
   const getBadgeColor = (cond: string) => {
     if (cond === "Critical") return "bg-rose-100 text-rose-700 border-rose-200";
     if (cond === "Urgent") return "bg-amber-100 text-amber-700 border-amber-200";
@@ -156,9 +155,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   };
 
   return (
-    <div className="space-y-6">
-      
-      {/* Top Bar */}
+    <div className="w-full pb-12 space-y-6">
       <div className="flex items-center justify-between border-b border-indigo-50 pb-4">
         <div>
           <h2 className="text-xl font-black text-slate-800">Operational Desk</h2>
@@ -166,19 +163,17 @@ const handleSubmit = async (e: React.FormEvent) => {
         </div>
         <button
           onClick={() => setIsOpen(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md shadow-indigo-100 transition-all"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md shadow-indigo-100 transition-all shrink-0"
         >
           <Plus size={16} /> Verify & Create Appointment
         </button>
       </div>
 
-      {/* Info Banner */}
       <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl text-sm font-semibold flex items-center gap-2">
-        <AlertCircle size={16} className="text-amber-600" />
-        হাসপাতালের সিরিয়াল চেক করে পেশেন্টের সাথে কথা বলে এই তথ্যগুলো পূরণ করুন। এটি সরাসরি Doctor ড্যাশবোর্ডে চলে যাবে।
+        <AlertCircle size={16} className="text-amber-600 flex-shrink-0" />
+        হাসপাতালের সিরিয়াল চেক করে পেশেন্টের সাথে কথা বলে এই তথ্যগুলো পূরণ করুন। এটি সরাসরি Doctor ড্যাশবোর্ডে চলে যাবে।
       </div>
 
-      {/* Pipeline List */}
       <div className="space-y-4">
         {appointments.map(app => (
           <div key={app.id} className="bg-white rounded-2xl border border-indigo-50 shadow-sm p-6 space-y-4">
@@ -194,28 +189,39 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <p className="text-xs text-slate-400 font-medium">{app.doctor} • {app.date} • {app.time} • Mob: {app.phone}</p>
               </div>
               
-              {app.step < 4 ? (
-                <button 
-                  onClick={() => advanceAppointmentStep(app.id, app.step)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 transition-colors"
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => {
+                    setEditingPatient(app);
+                    setIsEditModalOpen(true);
+                  }}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1 transition-colors"
                 >
-                  Next Step: {PIPELINE_STEPS[app.step + 1]} <ChevronRight size={14} />
+                  Edit / Update Info
                 </button>
-              ) : (
-                <span className="bg-emerald-100 text-emerald-700 text-xs font-black px-4 py-2 rounded-xl flex items-center gap-1">
-                  <CheckCircle size={14} /> Approved & Active ✓
-                </span>
-              )}
+
+                {app.step < 4 ? (
+                  <button 
+                    onClick={() => advanceAppointmentStep(app.id, app.step)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 transition-colors"
+                  >
+                    Next Step: {PIPELINE_STEPS[app.step + 1]} <ChevronRight size={14} />
+                  </button>
+                ) : (
+                  <span className="bg-emerald-100 text-emerald-700 text-xs font-black px-4 py-2 rounded-xl flex items-center gap-1">
+                    <CheckCircle size={14} /> Approved & Active ✓
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* প্রি-কনসালটেশন কার্ড */}
             <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 text-xs space-y-2">
               <div className="flex items-center gap-1 text-indigo-700 font-black uppercase tracking-wider text-[10px]">
                 <UserCheck size={12} /> Pre-Consultation Support Data
               </div>
               <p className="text-slate-700 font-medium"><strong className="text-slate-900">Chief Complaint:</strong> {app.chiefComplaint}</p>
               {app.vitalSigns && <p className="text-slate-700 font-medium"><strong className="text-slate-900">Vitals/History:</strong> {app.vitalSigns}</p>}
-              {app.teamNotes && <p className="text-slate-600 italic"><strong className="text-slate-900 font-normal not-italic font-semibold">Team Assessment:</strong> "{app.teamNotes}"</p>}
+              {app.teamNotes && <p className="text-slate-600 italic"><strong className="text-slate-900 font-semibold not-italic">Team Assessment:</strong> "{app.teamNotes}"</p>}
               
               {app.documentUrl && (
                 <a 
@@ -229,8 +235,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               )}
             </div>
 
-            {/* Progress Pipeline Indicator */}
-            <div className="flex items-center gap-1 overflow-x-auto pt-2 border-t border-dashed border-slate-100">
+            <div className="flex items-center gap-1 overflow-x-auto pt-2 border-t border-dashed border-slate-100 pb-1">
               {PIPELINE_STEPS.map((stepName, i) => (
                 <div key={stepName} className="flex items-center gap-1 shrink-0">
                   <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold ${
@@ -248,12 +253,12 @@ const handleSubmit = async (e: React.FormEvent) => {
         ))}
       </div>
 
-      {/* ─── POPUP MODAL FORM ─── */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm m-0">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-4 mx-2 max-h-[90vh] flex flex-col">
+{isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          {/* মূল মডাল বক্সটিতে max-h দিয়ে উচ্চতা বেঁধে দেওয়া হয়েছে এবং overflow-hidden রাখা হয়েছে */}
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] overflow-hidden">
             
-            {/* Modal Header */}
+            {/* হেডার অংশ যা স্ক্রোল হবে না (shrink-0) */}
             <div className="bg-indigo-50 px-6 py-4 flex items-center justify-between border-b border-indigo-100 shrink-0">
               <div>
                 <h3 className="font-black text-indigo-950 text-base">Hospital Serial Verification</h3>
@@ -264,10 +269,9 @@ const handleSubmit = async (e: React.FormEvent) => {
               </button>
             </div>
 
-            {/* Modal Body */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+            {/* ফর্মের যে অংশগুলো ডেটা এন্ট্রি করার জায়গা, তা স্ক্রোল করার জন্য overflow-y-auto এবং flex-1 দেওয়া হয়েছে */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
               
-              {/* ১. বেসিক অ্যাপয়েন্টমেন্ট ইনফো */}
               <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 space-y-3">
                 <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider">1. Schedule & Severity</div>
                 <div className="grid grid-cols-2 gap-3">
@@ -282,47 +286,45 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-  <label className="block text-[11px] font-bold text-slate-600 mb-1">Assign Doctor</label>
-  <select 
-    value={formData.doctor} 
-    onChange={e => setFormData({ ...formData, doctor: e.target.value })} 
-    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500"
-    required
-  >
-    <option value="">Select Doctor</option>
-    {onboardedDoctors.map((doc) => (
-      <option key={doc.id} value={doc.name}>{doc.name}</option>
-    ))}
-  </select>
-</div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Assign Doctor</label>
+                    <select 
+                      value={formData.doctor} 
+                      onChange={e => setFormData({ ...formData, doctor: e.target.value })} 
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500"
+                      required
+                    >
+                      <option value="">Select Doctor</option>
+                      {onboardedDoctors.map((doc) => (
+                        <option key={doc.id} value={doc.name}>{doc.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div>
-    <label className="block text-[11px] font-bold text-slate-600 mb-1">Assign Chamber</label>
-    <select 
-  value={formData.chamber} 
-  onChange={(e) => setFormData({...formData, chamber: e.target.value})}
-  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500"
-  required
->
-  <option value="">Select Chamber</option>
-  <option value="Japan Bangladesh Hospital">Japan Bangladesh Hospital</option>
-  <option value="Millenium hospital">Millenium hospital</option>
-</select>
-  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Patient Condition</label>
-                    <select value={formData.condition} onChange={e => setFormData({ ...formData, condition: e.target.value as any })} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500">
-                      <option value="Normal">🟢 Normal Case</option>
-                      <option value="Urgent">🟡 Urgent Case</option>
-                      <option value="Critical">🔴 Critical Case</option>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Assign Chamber</label>
+                    <select 
+                      value={formData.chamber} 
+                      onChange={(e) => setFormData({...formData, chamber: e.target.value})}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500"
+                      required
+                    >
+                      <option value="">Select Chamber</option>
+                      <option value="Japan Bangladesh Hospital">Japan Bangladesh Hospital</option>
+                      <option value="Millenium hospital">Millenium hospital</option>
                     </select>
                   </div>
                 </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Patient Condition</label>
+                  <select value={formData.condition} onChange={e => setFormData({ ...formData, condition: e.target.value as any })} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:border-indigo-500">
+                    <option value="Normal">🟢 Normal Case</option>
+                    <option value="Urgent">🟡 Urgent Case</option>
+                    <option value="Critical">🔴 Critical Case</option>
+                  </select>
+                </div>
               </div>
 
-              {/* ২. পেশেন্ট ও প্রি-কনসালটেশন ডিটেইলস */}
               <div className="bg-indigo-50/20 p-4 rounded-2xl border border-indigo-50/50 space-y-3">
                 <div className="text-[11px] font-black text-indigo-600 uppercase tracking-wider">2. Patient Call & Medical Sync</div>
-                
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2">
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Patient Full Name</label>
@@ -368,8 +370,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 shrink-0">
+              {/* ফুটার বা সাবমিট বাটন অংশ যা স্ক্রোলের নিচে ফিক্সড বা আলাদা থাকবে (shrink-0) */}
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 shrink-0 pb-2">
                 <button type="button" onClick={() => setIsOpen(false)} className="text-slate-500 hover:bg-slate-50 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors">
                   Cancel
                 </button>
@@ -377,12 +379,91 @@ const handleSubmit = async (e: React.FormEvent) => {
                   Confirm Serial & Sync to Doctor
                 </button>
               </div>
-            </form>
 
+            </form>
           </div>
         </div>
       )}
+      {isEditModalOpen && editingPatient && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
+    <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
+            <div className="bg-indigo-50 px-6 py-4 flex items-center justify-between border-b border-indigo-100 shrink-0">
+              <div>
+                <h3 className="font-black text-indigo-950 text-base">Update Patient Information</h3>
+                <p className="text-[11px] text-indigo-700 font-medium">Modify records and sync with system</p>
+              </div>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                <X size={18} />
+              </button>
+            </div>
 
+            <form onSubmit={handleUpdatePatient} className="p-6 space-y-4 overflow-y-auto flex-1">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Patient Full Name</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={editingPatient.name} 
+                  onChange={e => setEditingPatient({ ...editingPatient, name: e.target.value })} 
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Age</label>
+                  <input 
+                    type="number" 
+                    value={editingPatient.age} 
+                    onChange={e => setEditingPatient({ ...editingPatient, age: e.target.value })} 
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Mobile Number</label>
+                  <input 
+                    type="tel" 
+                    required 
+                    value={editingPatient.phone} 
+                    onChange={e => setEditingPatient({ ...editingPatient, phone: e.target.value })} 
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500" 
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Chief Complaint</label>
+                <textarea 
+                  rows={2} 
+                  required 
+                  value={editingPatient.chiefComplaint} 
+                  onChange={e => setEditingPatient({ ...editingPatient, chiefComplaint: e.target.value })} 
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500 resize-none" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Team Notes / Assessment</label>
+                <input 
+                  type="text" 
+                  value={editingPatient.teamNotes || ""} 
+                  onChange={e => setEditingPatient({ ...editingPatient, teamNotes: e.target.value })} 
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500" 
+                />
+              </div>
+
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 shrink-0">
+                <button type="button" onClick={() => setIsEditModalOpen(false)} className="text-slate-500 hover:bg-slate-50 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-md transition-all">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

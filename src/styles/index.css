@@ -1,3 +1,18 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+/* রুট লেভেলে overflow hidden বাদ দিন যাতে প্রয়োজনমতো স্ক্রোল কাজ করতে পারে */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* মেইন লেআউট ফিক্স – সাইডবার এবং মেইন উইন্ডো ফিক্স রাখতে এটি ঠিক আছে */
+.app-layout-fix {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
