@@ -166,7 +166,7 @@ const [callNotes, setCallNotes] = useState<Record<string, string>>({});
 const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 const [searchQuery, setSearchQuery] = useState("");
 const [loading, setLoading] = useState(true);
-
+const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
 // ২. ডাটা এন্ট্রির জন্য স্টেট (একবারই)
 const [dataEntry, setDataEntry] = useState({
@@ -767,23 +767,48 @@ const myLiveAppointments = appointments.filter((app) => {
   return isMyPatient && isChamberMatch && isConfirmed; // এখানেও এটি যোগ করে দিন
 });
 
-  return (
-  <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-['DM_Sans',sans-serif]">
+ return (
+  <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-['DM_Sans',sans-serif] relative">
     
-    {/* সাইডবার */}
-    <aside className="w-64 bg-gradient-to-b from-indigo-700 to-purple-800 flex flex-col flex-shrink-0 h-screen shadow-2xl z-20">
+    {/* মোবাইল ওভারলে (Sidebar খোলা থাকলে পেছনের স্ক্রিন হালকা অন্ধকার হবে) */}
+    {isSidebarOpen && (
+      <div 
+        onClick={() => setIsSidebarOpen(false)}
+        className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
+      />
+    )}
+
+    {/* সাইডবার (মোবাইলে স্লাইডিং অ্যানিমেশন ও ফুল-স্ক্রিন, ডেস্কটপে ফিক্সড) */}
+    <aside className={`
+      fixed md:static inset-y-0 left-0 z-40 
+      w-64 bg-gradient-to-b from-indigo-700 to-purple-800 
+      flex flex-col flex-shrink-0 h-screen shadow-2xl 
+      transform transition-transform duration-300 ease-in-out
+      ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+    `}>
       
       {/* ওপরের লোগো এবং ইউজার প্রোফাইল অংশ */}
       <div className="p-6 border-b border-white/10 flex-shrink-0">
-        <div className="flex items-center gap-2.5 mb-5">
-          <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
-            <img src={logoImg} alt="ZEE CARE Logo" className="w-full h-full object-contain" />
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl overflow-hidden bg-white/90 flex items-center justify-center p-0.5 shadow-sm">
+              <img src={logoImg} alt="ZEE CARE Logo" className="w-full h-full object-contain" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-white font-black text-base leading-none">ZEE CARE</span>
+              <span className="text-[9px] font-bold text-teal-200/70 mt-0.5 tracking-wider">MEDITRACK CLIENT</span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-white font-black text-base leading-none">ZEE CARE</span>
-            <span className="text-[9px] font-bold text-teal-200/70 mt-0.5 tracking-wider">MEDITRACK CLIENT</span>
-          </div>
+          
+          {/* মোবাইলের জন্য সাইডবার ক্লোজ (X) বাটন */}
+          <button 
+            onClick={() => setIsSidebarOpen(false)}
+            className="md:hidden text-white/70 hover:text-white p-1 text-lg font-bold"
+          >
+            ✕
+          </button>
         </div>
+
         <div className="bg-white/10 rounded-2xl p-4">
           <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
             <User className="w-5 h-5 text-white" />
@@ -802,7 +827,10 @@ const myLiveAppointments = appointments.filter((app) => {
         ].map(item => (
           <button
             key={item.id}
-            onClick={() => setDoctorView(item.id)}
+            onClick={() => {
+              setDoctorView(item.id);
+              setIsSidebarOpen(false); // মোবাইলে মেনু আইটেমে ক্লিক করলে সাইডবার অটো বন্ধ হয়ে যাবে
+            }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
               doctorView === item.id ? "bg-white text-teal-700 shadow-lg" : "text-white/65 hover:bg-white/10 hover:text-white"
             }`}
@@ -816,9 +844,8 @@ const myLiveAppointments = appointments.filter((app) => {
         ))}
       </nav>
 
-<div className="p-4 border-t border-white/10 flex flex-col gap-2 flex-shrink-0 bg-black/10">
-        
-        {/* Back Button */}
+      {/* নিচের লগআউট ও ব্যাক বাটন */}
+      <div className="p-4 border-t border-white/10 flex flex-col gap-2 flex-shrink-0 bg-black/10">
         <button
           onClick={() => {
             setCurrentUser(null);
@@ -830,7 +857,6 @@ const myLiveAppointments = appointments.filter((app) => {
           <span>Back to Portal</span>
         </button>
 
-        {/* Logout Button */}
         <button
           onClick={() => {
             setCurrentUser(null);
@@ -841,21 +867,34 @@ const myLiveAppointments = appointments.filter((app) => {
           <LogOut className="w-4 h-4" />
           <span>Logout</span>
         </button>
-
       </div>
 
     </aside>
 
     {/* মেইন কন্টেন্ট এলাকা */}
     <main className="flex-1 flex flex-col min-w-0 w-full h-full overflow-hidden bg-slate-50">
-      <header className="bg-white border-b border-teal-100 px-8 py-5 flex items-center justify-between sticky top-0 z-10 flex-shrink-0 shadow-sm w-full">
-        <div>
-          <h1 className="text-xl font-black text-teal-900">
+      
+      {/* হেডার অংশ */}
+      <header className="bg-white border-b border-teal-100 px-4 md:px-8 py-4 md:py-5 flex items-center justify-between sticky top-0 z-10 flex-shrink-0 shadow-sm w-full">
+        <div className="flex items-center gap-3">
+          
+          {/* মোবাইলের জন্য হ্যামবার্গার মেনু টগল বাটন */}
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="md:hidden p-2 rounded-xl bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors focus:outline-none"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
+          <h1 className="text-lg md:text-xl font-black text-teal-900">
             {doctorView === "patients" && "Patient Overview"}
             {doctorView === "team" && "My Care Team"}
             {doctorView === "appointments" && "Live Consultation Queue"}
           </h1>
         </div>
+
         <div className="flex items-center gap-4">
           <Bell className="w-5 h-5 text-slate-400" />
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
